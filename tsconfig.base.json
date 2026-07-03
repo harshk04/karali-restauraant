@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@karali/ui": ["packages/ui/src"],
+      "@karali/ui/*": ["packages/ui/src/*"],
+      "@karali/types": ["packages/types/src"],
+      "@karali/types/*": ["packages/types/src/*"],
+      "@karali/utils": ["packages/utils/src"],
+      "@karali/utils/*": ["packages/utils/src/*"],
+      "@karali/hooks": ["packages/hooks/src"],
+      "@karali/hooks/*": ["packages/hooks/src/*"],
+      "@karali/config": ["packages/config/src"],
+      "@karali/config/*": ["packages/config/src/*"]
+    }
+  },
+  "include": ["apps", "packages", "prisma"]
+}

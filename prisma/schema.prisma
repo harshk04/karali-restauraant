@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  customer
+  reception_staff
+  manager
+  admin
+  super_admin
+}
+
+enum UserStatus {
+  active
+  inactive
+  suspended
+}
+
+enum TableStatus {
+  available
+  reserved
+  occupied
+  cleaning
+  offline
+}
+
+enum SlotStatus {
+  available
+  limited
+  sold_out
+  closed
+}
+
+enum BookingStatus {
+  pending
+  confirmed
+  checked_in
+  cancelled
+  no_show
+}
+
+enum PaymentStatus {
+  pending
+  authorized
+  paid
+  failed
+  refunded
+}
+
+enum NotificationStatus {
+  queued
+  sent
+  failed
+}
+
+enum NotificationType {
+  email
+  sms
+  whatsapp
+  push
+}
+
+model User {
+  id        String      @id @default(cuid())
+  name      String
+  email     String      @unique
+  phone     String?     @unique
+  password  String
+  role      Role
+  status    UserStatus  @default(active)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  bookings  Booking[]   @relation("CustomerBookings")
+  checkins  Checkin[]   @relation("StaffCheckins")
+  audits    AuditLog[]
+}
+
+model RestaurantTable {
+  id         String      @id @default(cuid())
+  tableNumber String     @unique
+  capacity   Int
+  status     TableStatus @default(available)
+  positionX  Float
+  positionY  Float
+
+  bookings   Booking[]
+}
+
+model Slot {
+  id         String     @id @default(cuid())
+  date       DateTime
+  startTime  String
+  endTime    String
+  capacity   Int
+  status     SlotStatus @default(available)
+
+  bookings   Booking[]
+}
+
+model Booking {
+  id             String         @id @default(cuid())
+  bookingId      String         @unique
+  customerId     String
+  customer       User           @relation("CustomerBookings", fields: [customerId], references: [id])
+  tableId        String
+  table          RestaurantTable @relation(fields: [tableId], references: [id])
+  slotId         String
+  slot           Slot           @relation(fields: [slotId], references: [id])
+  pax            Int
+  status         BookingStatus  @default(pending)
+  specialRequest String?
+  paymentStatus  PaymentStatus  @default(pending)
+  qrCode         String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  checkin        Checkin?
+  notifications  Notification[]
+  payment        Payment?
+}
+
+model Checkin {
+  id         String   @id @default(cuid())
+  bookingId  String   @unique
+  booking    Booking  @relation(fields: [bookingId], references: [id])
+  checkedInAt DateTime @default(now())
+  staffId    String
+  staff      User     @relation("StaffCheckins", fields: [staffId], references: [id])
+}
+
+model Notification {
+  id        String              @id @default(cuid())
+  bookingId String
+  booking   Booking             @relation(fields: [bookingId], references: [id])
+  type      NotificationType
+  status    NotificationStatus  @default(queued)
+  sentAt    DateTime?
+}
+
+model Payment {
+  id                  String        @id @default(cuid())
+  bookingId           String        @unique
+  booking             Booking       @relation(fields: [bookingId], references: [id])
+  razorpayPaymentId   String?
+  amount              Int
+  status              PaymentStatus @default(pending)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  metadata  Json
+  createdAt DateTime @default(now())
+}
