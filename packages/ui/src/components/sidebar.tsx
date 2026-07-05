@@ -3,9 +3,11 @@
 export function Sidebar({
   items,
   active,
+  footer,
 }: {
   items: Array<{ label: string; href: string; icon?: any }>;
   active: string;
+  footer?: any;
 }) {
   return (
     <aside className="lux-panel lux-panel-strong sticky top-0 hidden h-screen w-72 flex-col rounded-none border-r border-white/30 p-6 lg:flex">
@@ -36,22 +38,7 @@ export function Sidebar({
           </a>
         ))}
       </nav>
-      <div className="lux-panel mt-auto rounded-[28px] p-5">
-        <div className="text-[11px] uppercase tracking-[0.3em] text-[#554336]/65">
-          Service mode
-        </div>
-        <div className="mt-3 flex items-center justify-between">
-          <div>
-            <div className="lux-heading text-lg font-semibold text-[#231a13]">
-              Terminal 5
-            </div>
-            <div className="text-sm text-[#554336]">
-              Luxury dining operations
-            </div>
-          </div>
-          <span className="lux-chip">Live</span>
-        </div>
-      </div>
+      {footer ? <div className="mt-auto">{footer}</div> : null}
     </aside>
   );
 }

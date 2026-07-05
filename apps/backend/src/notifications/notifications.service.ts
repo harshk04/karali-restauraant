@@ -8,6 +8,7 @@ import { ConfigService } from "@nestjs/config";
 import { InjectModel } from "@nestjs/mongoose";
 import crypto from "crypto";
 import { Model } from "mongoose";
+import { buildReceiptPdf } from "../common/receipt-pdf";
 import { Booking, BookingDocument } from "../database/schemas/booking.schema";
 
 type BookingNotificationPayload = {
@@ -19,6 +20,11 @@ type BookingNotificationPayload = {
   pax?: number;
   totalAmount?: number;
   qrCode?: string;
+  paymentStatus?: "pending" | "paid" | "failed";
+  paymentMethod?: "razorpay" | "pay_later";
+  paymentId?: string;
+  razorpayPaymentId?: string;
+  razorpayOrderId?: string;
 };
 
 type BookingNotificationResult = {
@@ -184,24 +190,27 @@ export class NotificationsService {
     return { received: true };
   }
 
-  private async uploadQrMedia(qrCode?: string) {
+  private async uploadMedia(input: {
+    bytes: Buffer;
+    mimeType: string;
+    filename: string;
+  }) {
     const accessToken = this.configService.get<string>("whatsappAccessToken");
     const phoneNumberId = this.configService.get<string>(
       "whatsappPhoneNumberId",
     );
-    const qrPng = this.decodeQrPng(qrCode);
 
-    if (!accessToken || !phoneNumberId || !qrPng) {
+    if (!accessToken || !phoneNumberId || !input.bytes?.length) {
       return "";
     }
 
     const formData = new FormData();
     formData.append("messaging_product", "whatsapp");
-    formData.append("type", "image/png");
+    formData.append("type", input.mimeType);
     formData.append(
       "file",
-      new Blob([qrPng], { type: "image/png" }),
-      "booking-qr.png",
+      new Blob([new Uint8Array(input.bytes)], { type: input.mimeType }),
+      input.filename,
     );
 
     const response = await fetch(
@@ -224,6 +233,20 @@ export class NotificationsService {
 
     const data = (await response.json()) as { id?: string };
     return data.id || "";
+  }
+
+  private async uploadQrMedia(qrCode?: string) {
+    const qrPng = this.decodeQrPng(qrCode);
+
+    if (!qrPng) {
+      return "";
+    }
+
+    return this.uploadMedia({
+      bytes: qrPng,
+      mimeType: "image/png",
+      filename: "booking-qr.png",
+    });
   }
 
   private async sendImageMessage(to: string, mediaId: string, caption: string) {
@@ -314,6 +337,56 @@ export class NotificationsService {
     return data.messages?.[0]?.id || "";
   }
 
+  private async sendDocumentMessage(
+    to: string,
+    mediaId: string,
+    filename: string,
+    caption?: string,
+  ) {
+    const accessToken = this.configService.get<string>("whatsappAccessToken");
+    const phoneNumberId = this.configService.get<string>(
+      "whatsappPhoneNumberId",
+    );
+
+    if (!accessToken || !phoneNumberId || !mediaId) {
+      return "";
+    }
+
+    const response = await fetch(
+      `${this.apiBaseUrl()}/${phoneNumberId}/messages`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          recipient_type: "individual",
+          to,
+          type: "document",
+          document: {
+            id: mediaId,
+            filename,
+            caption: caption || undefined,
+          },
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      const details = await response.text();
+      throw new Error(
+        `WhatsApp document send failed with status ${response.status}${details ? `: ${details}` : ""}`,
+      );
+    }
+
+    const data = (await response.json()) as {
+      messages?: Array<{ id?: string }>;
+    };
+    return data.messages?.[0]?.id || "";
+  }
+
   private async sendTemplateMessage(to: string) {
     const accessToken = this.configService.get<string>("whatsappAccessToken");
     const phoneNumberId = this.configService.get<string>(
@@ -363,75 +436,38 @@ export class NotificationsService {
     return data.messages?.[0]?.id || "";
   }
 
-  private async sendBookingTemplateMessage(
-    to: string,
-    payload: Required<
-      Pick<
-        BookingNotificationPayload,
-        "customerName" | "bookingId" | "date" | "time" | "pax"
-      >
-    > & { amount: string },
-  ) {
-    const accessToken = this.configService.get<string>("whatsappAccessToken");
-    const phoneNumberId = this.configService.get<string>(
-      "whatsappPhoneNumberId",
-    );
-    const templateName =
-      this.configuredTemplateName() || "karali_booking_confirmation_v1";
-    const templateLanguage =
-      this.configService.get<string>("whatsappTemplateLanguage") || "en_US";
+  private currency(amount?: number) {
+    return `Rs. ${Number(amount || 0).toFixed(0)}`;
+  }
 
-    if (!accessToken || !phoneNumberId || !templateName) {
-      return "";
-    }
+  private buildBookingCaption(payload: BookingNotificationPayload) {
+    const lines = [
+      `Hello ${payload.customerName || "Guest"}, your Karali reservation is confirmed.`,
+      "",
+      `Booking ID: ${payload.bookingId}`,
+      `Date: ${payload.date || "-"}`,
+      `Time: ${payload.time || "-"}`,
+      `Guests: ${payload.pax || 0}`,
+    ];
 
-    const response = await fetch(
-      `${this.apiBaseUrl()}/${phoneNumberId}/messages`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to,
-          type: "template",
-          template: {
-            name: templateName,
-            language: {
-              code: templateLanguage,
-            },
-            components: [
-              {
-                type: "body",
-                parameters: [
-                  { type: "text", text: payload.customerName },
-                  { type: "text", text: payload.bookingId },
-                  { type: "text", text: payload.date },
-                  { type: "text", text: payload.time },
-                  { type: "text", text: String(payload.pax) },
-                  { type: "text", text: payload.amount },
-                ],
-              },
-            ],
-          },
-        }),
-      },
-    );
-
-    if (!response.ok) {
-      const details = await response.text();
-      throw new Error(
-        `WhatsApp booking template send failed with status ${response.status}${details ? `: ${details}` : ""}`,
+    if (payload.paymentStatus === "paid" && (payload.totalAmount || 0) > 0) {
+      lines.push(
+        `Prepaid Amount: INR ${this.currency(payload.totalAmount)}`,
+        "This prepaid amount will be adjusted in the final bill.",
       );
     }
 
-    const data = (await response.json()) as {
-      messages?: Array<{ id?: string }>;
-    };
-    return data.messages?.[0]?.id || "";
+    lines.push("Please present this QR pass at check-in.");
+
+    return lines.join("\n");
+  }
+
+  private buildPaymentReceiptCaption(payload: BookingNotificationPayload) {
+    return [
+      `Payment receipt for booking ${payload.bookingId}`,
+      `Amount Received: INR ${this.currency(payload.totalAmount)}`,
+      "This advance payment will be adjusted in the final restaurant bill.",
+    ].join("\n");
   }
 
   async sendBookingNotification(
@@ -468,67 +504,61 @@ export class NotificationsService {
     const qrFallbackUrl = backendUrl
       ? `${backendUrl.replace(/\/$/, "")}/qr/${encodeURIComponent(payload.bookingId)}/image`
       : "";
-    const summaryMessage =
-      `Karali booking confirmed\n\n` +
-      `Booking ID: ${payload.bookingId}\n` +
-      `Guest: ${payload.customerName || "Guest"}\n` +
-      `Date: ${payload.date || "-"}\n` +
-      `Time: ${payload.time || "-"}\n` +
-      `Guests: ${payload.pax || 0}\n` +
-      (confirmationUrl ? `Confirmation: ${confirmationUrl}\n` : "") +
-      (qrFallbackUrl ? `QR fallback: ${qrFallbackUrl}` : "");
+    const caption = [
+      this.buildBookingCaption(payload),
+      confirmationUrl ? `Confirmation: ${confirmationUrl}` : "",
+      !payload.qrCode && qrFallbackUrl ? `QR fallback: ${qrFallbackUrl}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
 
     try {
       const messageIds: string[] = [];
-      const useBookingTemplate = this.shouldUseBookingTemplate();
-      const useTemplateOpener = Boolean(
-        this.configService.get<boolean>("whatsappUseTemplateOpener"),
-      );
+      const mediaId = await this.uploadQrMedia(payload.qrCode);
 
-      if (useBookingTemplate) {
-        const bookingTemplateId = await this.sendBookingTemplateMessage(
+      if (mediaId) {
+        const imageMessageId = await this.sendImageMessage(
           normalizedPhone,
-          {
-            customerName: payload.customerName || "Guest",
-            bookingId: payload.bookingId,
-            date: payload.date || "-",
-            time: payload.time || "-",
-            pax: payload.pax || 0,
-            amount: `Rs. ${payload.totalAmount || 0}`,
-          },
+          mediaId,
+          caption,
         );
-        if (bookingTemplateId) {
-          messageIds.push(bookingTemplateId);
+        if (imageMessageId) {
+          messageIds.push(imageMessageId);
         }
-      } else if (useTemplateOpener) {
-        const openerMessageId = await this.sendTemplateMessage(normalizedPhone);
-        if (openerMessageId) {
-          messageIds.push(openerMessageId);
+      } else {
+        const textMessageId = await this.sendTextMessage(normalizedPhone, caption);
+        if (textMessageId) {
+          messageIds.push(textMessageId);
         }
       }
 
-      const allowFollowUpMessages = !useBookingTemplate;
-
-      if (allowFollowUpMessages) {
-        const mediaId = await this.uploadQrMedia(payload.qrCode);
-
-        if (mediaId) {
-          const imageMessageId = await this.sendImageMessage(
-            normalizedPhone,
-            mediaId,
-            `Karali reservation QR for ${payload.bookingId}`,
-          );
-          if (imageMessageId) {
-            messageIds.push(imageMessageId);
-          }
-        }
-
-        const textMessageId = await this.sendTextMessage(
-          normalizedPhone,
-          summaryMessage,
-        );
-        if (textMessageId) {
-          messageIds.push(textMessageId);
+      if (payload.paymentStatus === "paid" && (payload.totalAmount || 0) > 0) {
+        const receiptPdf = buildReceiptPdf({
+          bookingId: payload.bookingId,
+          customerName: payload.customerName || "Guest",
+          amountReceived: payload.totalAmount || 0,
+          paymentStatus: payload.paymentStatus,
+          paymentId: payload.paymentId,
+          razorpayPaymentId: payload.razorpayPaymentId,
+          razorpayOrderId: payload.razorpayOrderId,
+          date: payload.date,
+          time: payload.time,
+        });
+        const receiptMediaId = await this.uploadMedia({
+          bytes: receiptPdf,
+          mimeType: "application/pdf",
+          filename: `${payload.bookingId}-receipt.pdf`,
+        });
+        const receiptMessageId = receiptMediaId
+          ? await this.sendDocumentMessage(
+              normalizedPhone,
+              receiptMediaId,
+              `${payload.bookingId}-receipt.pdf`,
+              this.buildPaymentReceiptCaption(payload),
+            )
+          : "";
+        if (receiptMessageId) {
+          messageIds.push(receiptMessageId);
         }
       }
 

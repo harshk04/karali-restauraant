@@ -5,6 +5,7 @@ import { randomInt } from "crypto";
 import crypto from "crypto";
 import QRCode from "qrcode";
 import { Booking, BookingDocument } from "../database/schemas/booking.schema";
+import { buildReceiptPdf } from "../common/receipt-pdf";
 import { SlotsService } from "../slots/slots.service";
 import { NotificationsService } from "../notifications/notifications.service";
 
@@ -26,6 +27,11 @@ export class BookingsService {
     pax: number;
     totalAmount: number;
     qrCode: string;
+    paymentStatus: "pending" | "paid" | "failed";
+    paymentMethod: "razorpay" | "pay_later";
+    paymentId?: string;
+    razorpayPaymentId?: string;
+    razorpayOrderId?: string;
   }) {
     const notification =
       await this.notificationsService.sendBookingNotification(payload);
@@ -90,6 +96,7 @@ export class BookingsService {
       customerName: doc.customerName,
       email: doc.email,
       phone: doc.phone,
+      source: doc.source,
       paymentId: doc.paymentId,
       paymentMethod: doc.paymentMethod,
       couponCode: doc.couponCode,
@@ -116,6 +123,7 @@ export class BookingsService {
       customerName: doc.customerName,
       email: doc.email,
       phone: doc.phone,
+      source: doc.source,
       paymentId: doc.paymentId,
       paymentMethod: doc.paymentMethod,
       couponCode: doc.couponCode,
@@ -144,10 +152,31 @@ export class BookingsService {
     return this.toResponse(booking as BookingDocument | null);
   }
 
+  async receiptPdf(bookingId: string) {
+    const booking = await this.findByBookingId(bookingId);
+
+    if (!booking) {
+      throw new BadRequestException("Booking not found.");
+    }
+
+    return buildReceiptPdf({
+      bookingId: booking.bookingId,
+      customerName: booking.customerName,
+      amountReceived: booking.totalAmount,
+      paymentStatus: booking.paymentStatus,
+      paymentId: booking.paymentId,
+      razorpayPaymentId: booking.razorpayPaymentId,
+      razorpayOrderId: booking.razorpayOrderId,
+      date: booking.date,
+      time: booking.time,
+    });
+  }
+
   async create(dto: {
     customerName?: string;
     email?: string;
     phone?: string;
+    source?: "customer" | "manual";
     slotId: string;
     pax: number;
     specialRequest?: string;
@@ -178,6 +207,7 @@ export class BookingsService {
       customerName: dto.customerName || "Guest",
       email: dto.email || "",
       phone: dto.phone || "",
+      source: dto.source || "customer",
       slotId: dto.slotId,
       date,
       time,
@@ -207,6 +237,8 @@ export class BookingsService {
       pax: dto.pax,
       totalAmount: finalAmount,
       qrCode: created.qrCode,
+      paymentStatus: "pending",
+      paymentMethod: (dto.paymentMethod || "pay_later") as "razorpay" | "pay_later",
     });
 
     return this.toResponse(created as BookingDocument);
@@ -217,6 +249,7 @@ export class BookingsService {
     customerName?: string;
     email?: string;
     phone?: string;
+    source?: "customer" | "manual";
     slotId: string;
     pax: number;
     specialRequest?: string;
@@ -258,6 +291,7 @@ export class BookingsService {
       customerName: dto.customerName || "Guest",
       email: dto.email || "",
       phone: dto.phone || "",
+      source: dto.source || "customer",
       slotId: dto.slotId,
       date,
       time,
@@ -339,6 +373,11 @@ export class BookingsService {
         pax: response.pax,
         totalAmount: response.totalAmount,
         qrCode: response.qrCode,
+        paymentStatus: response.paymentStatus,
+        paymentMethod: response.paymentMethod,
+        paymentId: response.paymentId,
+        razorpayPaymentId: response.razorpayPaymentId,
+        razorpayOrderId: response.razorpayOrderId,
       });
     }
 

@@ -1,20 +1,40 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useRouter } from "next/navigation";
 import { Button, Card } from "@karali/ui";
 import jsQR from "jsqr";
 import { api } from "../../../lib/api";
 
+type ScannedBooking = {
+  bookingId: string;
+  customerName?: string;
+  email?: string;
+  phone?: string;
+  date?: string;
+  time?: string;
+  pax?: number;
+  status?: string;
+  paymentStatus?: string;
+  totalAmount?: number;
+  paymentMethod?: string;
+  checkedInAt?: string;
+};
+
 export default function ScannerPage() {
+  const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const scanTimerRef = useRef<number | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const isSubmittingRef = useRef(false);
   const autoStartRef = useRef(false);
-  const [scanCode, setScanCode] = useState("");
   const [isSecureContext, setIsSecureContext] = useState(true);
+  const [isCameraLive, setIsCameraLive] = useState(false);
   const [cameraStatus, setCameraStatus] = useState("Opening scanner...");
+  const [scannerMode, setScannerMode] = useState("Waiting for camera...");
+  const [isUploadingQr, setIsUploadingQr] = useState(false);
 
   useEffect(() => {
     setIsSecureContext(window.isSecureContext);
@@ -42,8 +62,6 @@ export default function ScannerPage() {
   async function submitScan(value: string) {
     const bookingId = parseBookingId(value);
 
-    setScanCode(value);
-
     if (!bookingId || isSubmittingRef.current) {
       if (!bookingId) {
         setCameraStatus("QR code detected, but no valid booking ID was found.");
@@ -52,14 +70,23 @@ export default function ScannerPage() {
     }
 
     isSubmittingRef.current = true;
+    setCameraStatus(`QR detected. Confirming booking ${bookingId}...`);
 
     try {
-      await api.post("/admin/scan-qr", {
+      const response = await api.post<ScannedBooking>("/admin/scan-qr", {
         bookingId,
         staffId: "admin",
       });
       setCameraStatus(`QR code scanned successfully for ${bookingId}.`);
       stopScan();
+      const params = new URLSearchParams();
+      Object.entries(response.data || {}).forEach(([key, rawValue]) => {
+        if (rawValue === undefined || rawValue === null || rawValue === "") {
+          return;
+        }
+        params.set(key, String(rawValue));
+      });
+      router.push(`/admin/scanner/success?${params.toString()}`);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unable to verify this QR code.";
@@ -112,11 +139,69 @@ export default function ScannerPage() {
     animationFrameRef.current = window.requestAnimationFrame(scanFrame);
   }
 
+  async function decodeQrFromFile(file: File) {
+    const imageUrl = URL.createObjectURL(file);
+
+    try {
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error("Unable to read the uploaded image."));
+        img.src = imageUrl;
+      });
+
+      const canvas = document.createElement("canvas");
+      canvas.width = image.naturalWidth || image.width;
+      canvas.height = image.naturalHeight || image.height;
+
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (!context) {
+        throw new Error("QR scanning is unavailable because the canvas could not be initialized.");
+      }
+
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+      const result = jsQR(imageData.data, imageData.width, imageData.height);
+
+      if (!result?.data) {
+        throw new Error("No QR code was detected in the uploaded image.");
+      }
+
+      return result.data;
+    } finally {
+      URL.revokeObjectURL(imageUrl);
+    }
+  }
+
+  async function handleQrUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setIsUploadingQr(true);
+    setCameraStatus(`Reading uploaded QR image: ${file.name}`);
+    setScannerMode("Processing uploaded QR");
+
+    try {
+      const decodedValue = await decodeQrFromFile(file);
+      await submitScan(decodedValue);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to process the uploaded QR image.";
+      setCameraStatus(message);
+    } finally {
+      event.target.value = "";
+      setIsUploadingQr(false);
+    }
+  }
+
   async function startScan() {
     try {
       stopScan();
-      setScanCode("");
       isSubmittingRef.current = false;
+      setIsCameraLive(false);
+      setScannerMode("Starting camera...");
 
       if (!window.isSecureContext) {
         setCameraStatus(
@@ -134,10 +219,12 @@ export default function ScannerPage() {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
+      setIsCameraLive(true);
       setCameraStatus(
         "Camera permission granted. Point the camera at the QR code.",
       );
       if ("BarcodeDetector" in window) {
+        setScannerMode("Live camera with BarcodeDetector");
         const Detector = (
           window as Window & {
             BarcodeDetector?: new (options: { formats: string[] }) => {
@@ -171,6 +258,7 @@ export default function ScannerPage() {
           }
         }, 1200);
       } else {
+        setScannerMode("Live camera with jsQR fallback");
         setCameraStatus(
           "Camera is active. Using a compatible QR scanning fallback for this browser.",
         );
@@ -182,7 +270,8 @@ export default function ScannerPage() {
           ? error.message
           : "Camera access denied or unavailable.";
       setCameraStatus(message);
-      setScanCode(message);
+      setIsCameraLive(false);
+      setScannerMode("Camera unavailable");
     }
   }
 
@@ -206,6 +295,8 @@ export default function ScannerPage() {
     scanTimerRef.current = null;
     if (animationFrameRef.current) window.cancelAnimationFrame(animationFrameRef.current);
     animationFrameRef.current = null;
+    setIsCameraLive(false);
+    setScannerMode("Scanner stopped");
   }
 
   return (
@@ -222,6 +313,21 @@ export default function ScannerPage() {
       </div>
 
       <Card className="space-y-4 p-8">
+        <div className="flex flex-wrap items-center gap-3">
+          <div
+            className={[
+              "rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em]",
+              isCameraLive
+                ? "bg-[#e4f6ea] text-[#1b6a36]"
+                : "bg-[#f7e8dc] text-[#8f4a00]",
+            ].join(" ")}
+          >
+            {isCameraLive ? "Camera live" : "Camera not live"}
+          </div>
+          <div className="rounded-full bg-[#f6efe9] px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#554336]">
+            {scannerMode}
+          </div>
+        </div>
         <div className="rounded-2xl border border-[#e8d9cd] bg-[#fffaf5] p-4 text-sm text-[#554336]">
           {cameraStatus}
         </div>
@@ -239,10 +345,22 @@ export default function ScannerPage() {
           <Button variant="secondary" onClick={stopScan}>
             Stop
           </Button>
+          <Button
+            variant="secondary"
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploadingQr}
+          >
+            {isUploadingQr ? "Uploading..." : "Upload QR"}
+          </Button>
         </div>
-        {scanCode ? (
-          <div className="text-sm text-[#8f4a00] break-all">{scanCode}</div>
-        ) : null}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          className="hidden"
+          onChange={handleQrUpload}
+        />
       </Card>
     </div>
   );

@@ -144,8 +144,18 @@ export class AdminService {
     return this.timingModel.findByIdAndUpdate(timing._id, { $set: payload }, { new: true }).lean();
   }
 
-  async createClosure(payload: { startDate: string; endDate: string; reason?: string }) {
-    return this.closureModel.create({ ...payload, active: true });
+  async createClosure(payload: {
+    startDate: string;
+    endDate: string;
+    reason?: string;
+    displayReasonToCustomers?: boolean;
+  }) {
+    return this.closureModel.create({
+      ...payload,
+      reason: payload.reason || "",
+      displayReasonToCustomers: Boolean(payload.displayReasonToCustomers),
+      active: true,
+    });
   }
 
   async createCoupon(payload: Partial<Coupon>) {

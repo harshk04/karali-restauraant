@@ -14,6 +14,9 @@ export class Closure {
   @Prop({ default: "" })
   reason!: string;
 
+  @Prop({ default: false })
+  displayReasonToCustomers!: boolean;
+
   @Prop({ default: true })
   active!: boolean;
 }

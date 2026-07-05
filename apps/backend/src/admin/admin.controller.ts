@@ -73,6 +73,10 @@ class ClosureDto {
   @IsOptional()
   @IsString()
   reason?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  displayReasonToCustomers?: boolean;
 }
 
 class CouponDto {
@@ -236,6 +240,21 @@ export class AdminController {
     return this.adminService.markBooking(bookingId, "completed");
   }
 
+  @Get("bookings/:bookingId/receipt")
+  async bookingReceipt(
+    @Param("bookingId") bookingId: string,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.bookingsService.receiptPdf(bookingId);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${bookingId}-receipt.pdf"`,
+    );
+    res.setHeader("Cache-Control", "private, max-age=60");
+    res.send(pdf);
+  }
+
   @Post("bookings/:bookingId/no-show")
   noShow(@Param("bookingId") bookingId: string) {
     return this.adminService.markBooking(bookingId, "no_show");
@@ -302,6 +321,7 @@ export class AdminController {
       customerName: dto.customerName,
       email: dto.email,
       phone: dto.phone,
+      source: "manual",
       slotId,
       pax: Number(dto.pax || 1),
       specialRequest: dto.specialRequest || "",

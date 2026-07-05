@@ -17,6 +17,9 @@ export class Booking {
   @Prop({ default: "" })
   phone!: string;
 
+  @Prop({ default: "customer" })
+  source!: "customer" | "manual";
+
   @Prop({ default: "" })
   razorpayOrderId!: string;
 

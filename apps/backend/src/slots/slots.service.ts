@@ -30,7 +30,12 @@ export class SlotsService {
     const closures = await this.closureModel.find({ active: true }).lean();
     const closure = closures.find((item) => this.isDateInRange(date, item.startDate, item.endDate));
     if (closure) {
-      return { status: "closed", reason: closure.reason || "Restaurant closed" };
+      return {
+        status: "closed",
+        reason: closure.displayReasonToCustomers
+          ? closure.reason || "Restaurant closed"
+          : "Unavailable on selected date",
+      };
     }
     return { status: "open", reason: "" };
   }
