@@ -30,10 +30,18 @@ export default function AdminBookingsPage() {
   const queryClient = useQueryClient();
   const { data: bookings = [] } = useQuery({
     queryKey: ["admin-bookings", search],
-    queryFn: async () => (await api.get<BookingRecord[]>("/admin/bookings", { params: { search } })).data,
+    queryFn: async () =>
+      (
+        await api.get<BookingRecord[]>("/admin/bookings", {
+          params: { search },
+        })
+      ).data,
   });
 
-  async function updateBooking(bookingId: string, action: (typeof actions)[number]["endpoint"]) {
+  async function updateBooking(
+    bookingId: string,
+    action: (typeof actions)[number]["endpoint"],
+  ) {
     await api.post(`/admin/bookings/${bookingId}/${action}`);
     await queryClient.invalidateQueries({ queryKey: ["admin-bookings"] });
     await queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
@@ -42,18 +50,33 @@ export default function AdminBookingsPage() {
   const filteredBookings = useMemo(() => bookings, [bookings]);
 
   return (
-    <div className="space-y-8 px-6 py-10 md:px-16">
-      <section className="space-y-4">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div className="space-y-8">
+      <section className="lux-hero lux-reveal p-8 md:p-10">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <h2 className="text-3xl font-bold text-[#231a13]">Bookings</h2>
-            <p className="text-[#554336]">Search, check in, complete, cancel, and mark no-shows.</p>
+            <p className="lux-eyebrow">Reservations Desk</p>
+            <h2 className="lux-heading mt-3 text-4xl font-bold text-[#231a13]">
+              Bookings
+            </h2>
+            <p className="mt-2 text-[#554336]">
+              Search, check in, complete, cancel, and mark no-shows with the
+              same premium rhythm as the guest experience.
+            </p>
           </div>
-          <div className="flex gap-3">
-            <Input value={search} onChange={(event: { target: { value: string } }) => setSearch(event.target.value)} placeholder="Search bookings" />
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Input
+              value={search}
+              onChange={(event: { target: { value: string } }) =>
+                setSearch(event.target.value)
+              }
+              placeholder="Search bookings"
+            />
             <Button href="/admin/manual-booking">Manual Booking</Button>
           </div>
         </div>
+      </section>
+
+      <section className="space-y-4">
         <Card className="overflow-hidden p-0">
           <DataTable
             columns={[
@@ -74,18 +97,33 @@ export default function AdminBookingsPage() {
       </section>
 
       <section className="space-y-3">
-        <h3 className="text-2xl font-semibold text-[#231a13]">Quick actions</h3>
+        <h3 className="lux-heading text-2xl font-semibold text-[#231a13]">
+          Quick actions
+        </h3>
         {filteredBookings.slice(0, 8).map((booking) => (
-          <Card key={booking.bookingId} className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <Card
+            key={booking.bookingId}
+            className="flex flex-col gap-4 p-8 md:flex-row md:items-center md:justify-between"
+          >
             <div>
-              <div className="font-semibold text-[#231a13]">{booking.customerName}</div>
+              <div className="lux-heading text-xl font-semibold text-[#231a13]">
+                {booking.customerName}
+              </div>
               <div className="text-sm text-[#554336]">
-                {booking.bookingId} · {booking.date} · {booking.time} · {booking.pax} guests
+                {booking.bookingId} · {booking.date} · {booking.time} ·{" "}
+                {booking.pax} guests
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
               {actions.map((action) => (
-                <Button key={action.endpoint} type="button" variant="secondary" onClick={() => updateBooking(booking.bookingId, action.endpoint)}>
+                <Button
+                  key={action.endpoint}
+                  type="button"
+                  variant="secondary"
+                  onClick={() =>
+                    updateBooking(booking.bookingId, action.endpoint)
+                  }
+                >
                   {action.label}
                 </Button>
               ))}

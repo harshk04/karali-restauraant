@@ -20,17 +20,24 @@ type BookingStore = {
   setEmail: (email: string) => void;
   setPhone: (phone: string) => void;
   setSpecialRequest: (specialRequest: string) => void;
+  resetBooking: () => void;
+};
+
+const initialBookingState = {
+  currentStep: 0,
+  date: undefined,
+  time: undefined,
+  pax: 2,
+  guestName: "",
+  email: "",
+  phone: "",
+  specialRequest: "",
 };
 
 export const useBookingStore = create<BookingStore>()(
   persist(
     (set) => ({
-      currentStep: 0,
-      pax: 2,
-      guestName: "",
-      email: "",
-      phone: "",
-      specialRequest: "",
+      ...initialBookingState,
       setStep: (currentStep) => set({ currentStep }),
       setDate: (date) => set({ date }),
       setTime: (time) => set({ time }),
@@ -39,6 +46,7 @@ export const useBookingStore = create<BookingStore>()(
       setEmail: (email) => set({ email }),
       setPhone: (phone) => set({ phone }),
       setSpecialRequest: (specialRequest) => set({ specialRequest }),
+      resetBooking: () => set(initialBookingState),
     }),
     {
       name: "karali-booking-store",

@@ -22,7 +22,6 @@ export function QRViewer({ value }: { value: string }) {
           </div>
         )}
       </div>
-      <p className="max-w-sm text-sm text-[#554336]">Encrypted QR payload bound to booking identity, expiry, and signature.</p>
     </Card>
   );
 }

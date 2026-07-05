@@ -5,8 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "postbuild": "node scripts/copy-standalone-assets.mjs",
-    "start": "node .next/standalone/server.js",
+    "start": "next start",
     "lint": "eslint .",
     "test": "playwright test"
   },
@@ -22,6 +21,7 @@
     "classnames": "^2.5.1",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.23.12",
+    "jsqr": "^1.4.0",
     "lucide-react": "^0.541.0",
     "next": "^15.4.5",
     "react": "^19.1.1",

@@ -9,6 +9,18 @@ export default () => ({
   razorpayKeyId: process.env.RAZORPAY_KEY_ID,
   razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET,
   razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
+  whatsappAccessToken: process.env.WHATSAPP_ACCESS_TOKEN,
+  whatsappPhoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID,
+  whatsappBusinessAccountId: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID,
+  whatsappApiVersion: process.env.WHATSAPP_API_VERSION || "v20.0",
+  whatsappWebhookVerifyToken: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN,
+  whatsappAppSecret: process.env.WHATSAPP_APP_SECRET,
+  whatsappTemplateName: process.env.WHATSAPP_TEMPLATE_NAME || "hello_world",
+  whatsappTemplateLanguage: process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en_US",
+  whatsappUseTemplateOpener:
+    process.env.WHATSAPP_USE_TEMPLATE_OPENER === "true",
+  whatsappUseBookingTemplate:
+    process.env.WHATSAPP_USE_BOOKING_TEMPLATE === "true",
   frontendUrl: process.env.FRONTEND_URL,
   backendUrl: process.env.BACKEND_URL,
 });

@@ -1,1 +1,83 @@
 @import "../styles/globals.css";
+
+.theme1-site .theme-parallax {
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.theme1-site iframe#map {
+  border: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.theme-video-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.82);
+  padding: 24px;
+}
+
+.theme-video-dialog {
+  position: relative;
+  width: min(960px, 100%);
+  aspect-ratio: 16 / 9;
+  background: #000;
+}
+
+.theme-video-dialog iframe {
+  border: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.theme-video-close {
+  position: absolute;
+  top: -18px;
+  right: -18px;
+  border: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 9999px;
+  background: #c4ab9f;
+  color: #fff;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.theme-loader-svg {
+  width: 120px;
+  height: 120px;
+  transform: rotate(-90deg);
+}
+
+.theme-loader-track,
+.theme-loader-progress {
+  fill: none;
+  stroke-width: 1;
+}
+
+.theme-loader-track {
+  stroke: rgba(196, 171, 159, 0.2);
+}
+
+.theme-loader-progress {
+  stroke: #c4ab9f;
+  transition: stroke-dashoffset 120ms linear;
+}
+
+.theme-loader-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #636363;
+  font-size: 20px;
+}

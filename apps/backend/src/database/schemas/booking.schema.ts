@@ -57,7 +57,13 @@ export class Booking {
   pax!: number;
 
   @Prop({ required: true, default: "confirmed" })
-  status!: "confirmed" | "pending" | "checked_in" | "cancelled" | "completed" | "no_show";
+  status!:
+    | "confirmed"
+    | "pending"
+    | "checked_in"
+    | "cancelled"
+    | "completed"
+    | "no_show";
 
   @Prop({ required: true, default: "pending" })
   paymentStatus!: "pending" | "paid" | "failed";
@@ -76,6 +82,25 @@ export class Booking {
 
   @Prop({ default: "" })
   specialRequest!: string;
+
+  @Prop({ default: "pending" })
+  whatsappNotificationStatus!:
+    | "pending"
+    | "sent_to_meta"
+    | "sent"
+    | "delivered"
+    | "read"
+    | "failed"
+    | "skipped";
+
+  @Prop({ type: [String], default: [] })
+  whatsappMessageIds!: string[];
+
+  @Prop({ default: null, type: Date })
+  whatsappNotificationSentAt!: Date | null;
+
+  @Prop({ default: "" })
+  whatsappNotificationError!: string;
 }
 
 export const BookingSchema = SchemaFactory.createForClass(Booking);

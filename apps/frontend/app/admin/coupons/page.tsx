@@ -83,7 +83,10 @@ export default function CouponsPage() {
   const createMutation = useMutation({
     mutationFn: async (payload: Record<string, unknown>) => {
       if (editingCode) {
-        return api.patch(`/admin/coupons/${encodeURIComponent(editingCode)}`, payload);
+        return api.patch(
+          `/admin/coupons/${encodeURIComponent(editingCode)}`,
+          payload,
+        );
       }
       return api.post("/admin/coupons", payload);
     },
@@ -94,22 +97,30 @@ export default function CouponsPage() {
       setMessage("Coupon saved successfully.");
     },
     onError: (error) => {
-      setMessage(error instanceof Error ? error.message : "Unable to save coupon.");
+      setMessage(
+        error instanceof Error ? error.message : "Unable to save coupon.",
+      );
     },
   });
 
   const toggleMutation = useMutation({
-    mutationFn: async (code: string) => api.patch(`/admin/coupons/${encodeURIComponent(code)}/toggle`),
+    mutationFn: async (code: string) =>
+      api.patch(`/admin/coupons/${encodeURIComponent(code)}/toggle`),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["admin-coupons"] });
     },
     onError: (error) => {
-      setMessage(error instanceof Error ? error.message : "Unable to update coupon status.");
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to update coupon status.",
+      );
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (code: string) => api.delete(`/admin/coupons/${encodeURIComponent(code)}`),
+    mutationFn: async (code: string) =>
+      api.delete(`/admin/coupons/${encodeURIComponent(code)}`),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["admin-coupons"] });
       if (editingCode) {
@@ -118,7 +129,9 @@ export default function CouponsPage() {
       }
     },
     onError: (error) => {
-      setMessage(error instanceof Error ? error.message : "Unable to delete coupon.");
+      setMessage(
+        error instanceof Error ? error.message : "Unable to delete coupon.",
+      );
     },
   });
 
@@ -137,7 +150,9 @@ export default function CouponsPage() {
         !needle ||
         coupon.code.toLowerCase().includes(needle) ||
         coupon.discountType.toLowerCase().includes(needle);
-      const matchesStatus = status === "all" || (status === "active" ? coupon.active : !coupon.active);
+      const matchesStatus =
+        status === "all" ||
+        (status === "active" ? coupon.active : !coupon.active);
       return matchesSearch && matchesStatus;
     });
   }, [coupons, search, status]);
@@ -182,14 +197,26 @@ export default function CouponsPage() {
   }
 
   return (
-    <div className="space-y-8 px-6 py-10 md:px-16">
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+    <div className="space-y-8">
+      <div className="lux-hero lux-reveal flex flex-col gap-4 p-8 md:flex-row md:items-end md:justify-between md:p-10">
         <div>
-          <h2 className="text-3xl font-bold text-[#231a13]">Coupons</h2>
-          <p className="text-[#554336]">Create, edit, deactivate, and monitor booking discounts.</p>
+          <p className="lux-eyebrow">Revenue Levers</p>
+          <h2 className="lux-heading mt-3 text-4xl font-bold text-[#231a13]">
+            Coupons
+          </h2>
+          <p className="mt-2 text-[#554336]">
+            Create, edit, deactivate, and monitor booking incentives without
+            breaking the premium visual system.
+          </p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Input value={search} onChange={(event: { target: { value: string } }) => setSearch(event.target.value)} placeholder="Search coupons" />
+          <Input
+            value={search}
+            onChange={(event: { target: { value: string } }) =>
+              setSearch(event.target.value)
+            }
+            placeholder="Search coupons"
+          />
           <select
             className="h-12 rounded-2xl border border-[#efd9c8] bg-white px-4 text-sm text-[#231a13] outline-none"
             value={status}
@@ -209,19 +236,28 @@ export default function CouponsPage() {
           ["Inactive", String(stats.inactive)],
           ["Redemptions", String(stats.used)],
         ].map(([label, value]) => (
-          <Card key={label} className="space-y-2">
-            <div className="text-xs uppercase tracking-[0.3em] text-[#8f4a00]">{label}</div>
-            <div className="text-3xl font-bold text-[#231a13]">{value}</div>
+          <Card key={label} className="space-y-2 p-7">
+            <div className="text-xs uppercase tracking-[0.3em] text-[#8f4a00]">
+              {label}
+            </div>
+            <div className="lux-heading text-3xl font-bold text-[#231a13]">
+              {value}
+            </div>
           </Card>
         ))}
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <Card className="space-y-5">
+        <Card className="space-y-5 p-8">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-2xl font-semibold text-[#231a13]">{editingCode ? `Edit ${editingCode}` : "Create Coupon"}</h3>
-              <p className="text-sm text-[#554336]">Validation, usage limits, and active state are enforced in the backend.</p>
+              <h3 className="lux-heading text-2xl font-semibold text-[#231a13]">
+                {editingCode ? `Edit ${editingCode}` : "Create Coupon"}
+              </h3>
+              <p className="text-sm text-[#554336]">
+                Validation, usage limits, and active state are enforced in the
+                backend.
+              </p>
             </div>
             {editingCode ? (
               <Button variant="secondary" type="button" onClick={resetForm}>
@@ -231,56 +267,141 @@ export default function CouponsPage() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <Input value={form.code} onChange={(event: { target: { value: string } }) => setForm({ ...form, code: event.target.value })} placeholder="CODE" />
+            <Input
+              value={form.code}
+              onChange={(event: { target: { value: string } }) =>
+                setForm({ ...form, code: event.target.value })
+              }
+              placeholder="CODE"
+            />
             <select
               className="h-12 rounded-2xl border border-[#efd9c8] bg-white px-4 text-sm text-[#231a13] outline-none"
               value={form.discountType}
-              onChange={(event) => setForm({ ...form, discountType: event.target.value as CouponForm["discountType"] })}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  discountType: event.target
+                    .value as CouponForm["discountType"],
+                })
+              }
             >
               <option value="percentage">Percentage</option>
               <option value="fixed">Fixed amount</option>
             </select>
-            <Input value={form.percentage} onChange={(event: { target: { value: string } }) => setForm({ ...form, percentage: event.target.value })} placeholder="Percentage" />
-            <Input value={form.fixedAmount} onChange={(event: { target: { value: string } }) => setForm({ ...form, fixedAmount: event.target.value })} placeholder="Fixed amount" />
-            <Input value={form.startDate} onChange={(event: { target: { value: string } }) => setForm({ ...form, startDate: event.target.value })} type="date" placeholder="Start date" />
-            <Input value={form.endDate} onChange={(event: { target: { value: string } }) => setForm({ ...form, endDate: event.target.value })} type="date" placeholder="End date" />
-            <Input value={form.usageLimit} onChange={(event: { target: { value: string } }) => setForm({ ...form, usageLimit: event.target.value })} placeholder="Usage limit" />
-            <Input value={form.perUserLimit} onChange={(event: { target: { value: string } }) => setForm({ ...form, perUserLimit: event.target.value })} placeholder="Per user limit" />
-            <Input value={form.minimumAmount} onChange={(event: { target: { value: string } }) => setForm({ ...form, minimumAmount: event.target.value })} placeholder="Minimum order amount" />
-            <Input value={form.maximumDiscount} onChange={(event: { target: { value: string } }) => setForm({ ...form, maximumDiscount: event.target.value })} placeholder="Maximum discount" />
+            <Input
+              value={form.percentage}
+              onChange={(event: { target: { value: string } }) =>
+                setForm({ ...form, percentage: event.target.value })
+              }
+              placeholder="Percentage"
+            />
+            <Input
+              value={form.fixedAmount}
+              onChange={(event: { target: { value: string } }) =>
+                setForm({ ...form, fixedAmount: event.target.value })
+              }
+              placeholder="Fixed amount"
+            />
+            <Input
+              value={form.startDate}
+              onChange={(event: { target: { value: string } }) =>
+                setForm({ ...form, startDate: event.target.value })
+              }
+              type="date"
+              placeholder="Start date"
+            />
+            <Input
+              value={form.endDate}
+              onChange={(event: { target: { value: string } }) =>
+                setForm({ ...form, endDate: event.target.value })
+              }
+              type="date"
+              placeholder="End date"
+            />
+            <Input
+              value={form.usageLimit}
+              onChange={(event: { target: { value: string } }) =>
+                setForm({ ...form, usageLimit: event.target.value })
+              }
+              placeholder="Usage limit"
+            />
+            <Input
+              value={form.perUserLimit}
+              onChange={(event: { target: { value: string } }) =>
+                setForm({ ...form, perUserLimit: event.target.value })
+              }
+              placeholder="Per user limit"
+            />
+            <Input
+              value={form.minimumAmount}
+              onChange={(event: { target: { value: string } }) =>
+                setForm({ ...form, minimumAmount: event.target.value })
+              }
+              placeholder="Minimum order amount"
+            />
+            <Input
+              value={form.maximumDiscount}
+              onChange={(event: { target: { value: string } }) =>
+                setForm({ ...form, maximumDiscount: event.target.value })
+              }
+              placeholder="Maximum discount"
+            />
             <label className="flex items-center gap-3 rounded-2xl border border-[#efd9c8] bg-white px-4 py-3 text-sm text-[#231a13] md:col-span-2">
               <input
                 checked={form.active}
                 className="h-4 w-4 accent-[#8f4a00]"
                 type="checkbox"
-                onChange={(event) => setForm({ ...form, active: event.target.checked })}
+                onChange={(event) =>
+                  setForm({ ...form, active: event.target.checked })
+                }
               />
               Active coupon
             </label>
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <Button type="button" onClick={saveCoupon} disabled={createMutation.isPending}>
-              {createMutation.isPending ? "Saving..." : editingCode ? "Update Coupon" : "Create Coupon"}
+            <Button
+              type="button"
+              onClick={saveCoupon}
+              disabled={createMutation.isPending}
+            >
+              {createMutation.isPending
+                ? "Saving..."
+                : editingCode
+                  ? "Update Coupon"
+                  : "Create Coupon"}
             </Button>
             <Button variant="secondary" type="button" onClick={resetForm}>
               Reset
             </Button>
           </div>
-          {message ? <p className="text-sm font-medium text-[#2d7a44]">{message}</p> : null}
+          {message ? (
+            <p className="text-sm font-medium text-[#2d7a44]">{message}</p>
+          ) : null}
         </Card>
 
-        <Card className="space-y-4">
+        <Card className="space-y-4 p-8">
           <div>
-            <h3 className="text-2xl font-semibold text-[#231a13]">Coupon rules</h3>
-            <p className="text-sm text-[#554336]">Production controls for discounts and redemption limits.</p>
+            <h3 className="lux-heading text-2xl font-semibold text-[#231a13]">
+              Coupon rules
+            </h3>
+            <p className="text-sm text-[#554336]">
+              Production controls for discounts and redemption limits.
+            </p>
           </div>
           <ul className="space-y-3 text-sm text-[#554336]">
             <li>• Percentage and fixed coupons are both supported.</li>
             <li>• Start and end dates prevent invalid redemption windows.</li>
-            <li>• Usage limits and per-user limits are enforced by the backend.</li>
-            <li>• Minimum spend and maximum discount keep promo math bounded.</li>
-            <li>• Active toggles instantly disable a coupon without deleting history.</li>
+            <li>
+              • Usage limits and per-user limits are enforced by the backend.
+            </li>
+            <li>
+              • Minimum spend and maximum discount keep promo math bounded.
+            </li>
+            <li>
+              • Active toggles instantly disable a coupon without deleting
+              history.
+            </li>
           </ul>
         </Card>
       </div>
@@ -298,23 +419,39 @@ export default function CouponsPage() {
         rows={filteredCoupons.map((coupon) => ({
           code: coupon.code,
           discountType: coupon.discountType,
-          value: coupon.discountType === "percentage" ? `${coupon.percentage}%` : `₹${coupon.fixedAmount}`,
+          value:
+            coupon.discountType === "percentage"
+              ? `${coupon.percentage}%`
+              : `₹${coupon.fixedAmount}`,
           active: coupon.active ? "Active" : "Inactive",
           usage: `${coupon.totalUsed || 0}`,
           limits: `${coupon.usageLimit || "∞"} / ${coupon.perUserLimit || "∞"}`,
           actions: (
             <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" type="button" onClick={() => editCoupon(coupon)}>
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() => editCoupon(coupon)}
+              >
                 Edit
               </Button>
-              <Button variant="secondary" type="button" onClick={() => toggleMutation.mutate(coupon.code)} disabled={toggleMutation.isPending}>
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() => toggleMutation.mutate(coupon.code)}
+                disabled={toggleMutation.isPending}
+              >
                 {coupon.active ? "Disable" : "Enable"}
               </Button>
               <Button
                 variant="secondary"
                 type="button"
                 onClick={() => {
-                  if (window.confirm(`Delete coupon ${coupon.code}? This cannot be undone.`)) {
+                  if (
+                    window.confirm(
+                      `Delete coupon ${coupon.code}? This cannot be undone.`,
+                    )
+                  ) {
                     deleteMutation.mutate(coupon.code);
                   }
                 }}

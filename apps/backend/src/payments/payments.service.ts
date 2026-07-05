@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
   Logger,
   OnModuleInit,
@@ -16,10 +15,12 @@ import { Booking, BookingDocument } from "../database/schemas/booking.schema";
 import { Payment, PaymentDocument } from "../database/schemas/payment.schema";
 import { Coupon, CouponDocument } from "../database/schemas/coupon.schema";
 import { Plan, PlanDocument } from "../database/schemas/plan.schema";
-import { Subscription, SubscriptionDocument } from "../database/schemas/subscription.schema";
+import {
+  Subscription,
+  SubscriptionDocument,
+} from "../database/schemas/subscription.schema";
 import { User, UserDocument } from "../database/schemas/user.schema";
 import { BookingsService } from "../bookings/bookings.service";
-import { NotificationsService } from "../notifications/notifications.service";
 import { PaymentsGateway } from "./payments.gateway";
 
 type CreateRazorpayOrderDto = {
@@ -57,14 +58,17 @@ export class PaymentsService implements OnModuleInit {
 
   constructor(
     private readonly configService: ConfigService,
-    @InjectModel(Payment.name) private readonly paymentModel: Model<PaymentDocument>,
-    @InjectModel(Coupon.name) private readonly couponModel: Model<CouponDocument>,
-    @InjectModel(Booking.name) private readonly bookingModel: Model<BookingDocument>,
+    @InjectModel(Payment.name)
+    private readonly paymentModel: Model<PaymentDocument>,
+    @InjectModel(Coupon.name)
+    private readonly couponModel: Model<CouponDocument>,
+    @InjectModel(Booking.name)
+    private readonly bookingModel: Model<BookingDocument>,
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
-    @InjectModel(Subscription.name) private readonly subscriptionModel: Model<SubscriptionDocument>,
+    @InjectModel(Subscription.name)
+    private readonly subscriptionModel: Model<SubscriptionDocument>,
     @InjectModel(Plan.name) private readonly planModel: Model<PlanDocument>,
     private readonly bookingsService: BookingsService,
-    private readonly notificationsService: NotificationsService,
     private readonly paymentsGateway: PaymentsGateway,
   ) {}
 
@@ -72,8 +76,15 @@ export class PaymentsService implements OnModuleInit {
     const keyId = this.configService.get<string>("razorpayKeyId");
     const keySecret = this.configService.get<string>("razorpayKeySecret");
 
-    if (!keyId || !keySecret || keyId.includes("replace-with") || keySecret.includes("replace-with")) {
-      this.logger.warn("Razorpay credentials are missing. Payment creation and verification are disabled until credentials are configured.");
+    if (
+      !keyId ||
+      !keySecret ||
+      keyId.includes("replace-with") ||
+      keySecret.includes("replace-with")
+    ) {
+      this.logger.warn(
+        "Razorpay credentials are missing. Payment creation and verification are disabled until credentials are configured.",
+      );
       return;
     }
 
@@ -82,7 +93,9 @@ export class PaymentsService implements OnModuleInit {
 
   private requireRazorpay() {
     if (!this.razorpay) {
-      throw new ServiceUnavailableException("Razorpay is not configured on this server.");
+      throw new ServiceUnavailableException(
+        "Razorpay is not configured on this server.",
+      );
     }
 
     return this.razorpay;
@@ -119,12 +132,18 @@ export class PaymentsService implements OnModuleInit {
     return `KR-${key.slice(0, 8).toUpperCase()}`;
   }
 
-  private async resolveCoupon(code: string | undefined, userId: string, amountInRupees: number) {
+  private async resolveCoupon(
+    code: string | undefined,
+    userId: string,
+    amountInRupees: number,
+  ) {
     if (!code) {
       return { discount: 0, coupon: null as any };
     }
 
-    const coupon = await this.couponModel.findOne({ code: code.trim().toUpperCase(), active: true }).lean();
+    const coupon = await this.couponModel
+      .findOne({ code: code.trim().toUpperCase(), active: true })
+      .lean();
     if (!coupon) {
       return { discount: 0, coupon: null as any };
     }
@@ -142,7 +161,11 @@ export class PaymentsService implements OnModuleInit {
     if (coupon.usageLimit && coupon.totalUsed >= coupon.usageLimit) {
       return { discount: 0, coupon: null as any };
     }
-    if (coupon.perUserLimit && coupon.usedBy.filter((entry: string) => entry === userId).length >= coupon.perUserLimit) {
+    if (
+      coupon.perUserLimit &&
+      coupon.usedBy.filter((entry: string) => entry === userId).length >=
+        coupon.perUserLimit
+    ) {
       return { discount: 0, coupon: null as any };
     }
 
@@ -159,10 +182,17 @@ export class PaymentsService implements OnModuleInit {
     return { discount, coupon };
   }
 
-  private async ensureUser(dto: { userId?: string; customerName: string; email?: string; phone?: string }) {
+  private async ensureUser(dto: {
+    userId?: string;
+    customerName: string;
+    email?: string;
+    phone?: string;
+  }) {
     const email = (dto.email || "").trim().toLowerCase();
     const userId = dto.userId || email || "u_1";
-    const existing = await this.userModel.findOne({ email: email || `${userId}@karali.local` }).lean();
+    const existing = await this.userModel
+      .findOne({ email: email || `${userId}@karali.local` })
+      .lean();
 
     if (existing) {
       return existing;
@@ -195,18 +225,24 @@ export class PaymentsService implements OnModuleInit {
       couponCode: dto.couponCode?.trim(),
     };
     const amountInRupees = Number(normalized.amount);
-    const amountInPaise = Math.round(amountInRupees * 100);
     const couponContext = await this.resolveCoupon(
       normalized.couponCode,
       dto.userId || normalized.email || "guest",
       amountInRupees,
     );
-    const payableAmount = Math.max(0, Math.round((amountInRupees - couponContext.discount) * 100));
+    const payableAmount = Math.max(
+      0,
+      Math.round((amountInRupees - couponContext.discount) * 100),
+    );
     const idempotencyKey = this.stableIdempotencyKey(normalized);
-    const existingPayment = await this.paymentModel.findOne({ idempotencyKey }).lean();
+    const existingPayment = await this.paymentModel
+      .findOne({ idempotencyKey })
+      .lean();
 
     if (existingPayment?.razorpayOrderId) {
-      const booking = await this.bookingsService.findByBookingId(existingPayment.bookingId);
+      const booking = await this.bookingsService.findByBookingId(
+        existingPayment.bookingId,
+      );
       return {
         status: existingPayment.paymentStatus,
         bookingId: existingPayment.bookingId,
@@ -224,7 +260,12 @@ export class PaymentsService implements OnModuleInit {
       };
     }
 
-    const user = await this.ensureUser({ userId: dto.userId, customerName: normalized.customerName, email: normalized.email, phone: normalized.phone });
+    const user = await this.ensureUser({
+      userId: dto.userId,
+      customerName: normalized.customerName,
+      email: normalized.email,
+      phone: normalized.phone,
+    });
     const bookingId = this.bookingIdFromKey(idempotencyKey);
     await this.bookingsService.createPending({
       bookingId,
@@ -290,7 +331,6 @@ export class PaymentsService implements OnModuleInit {
     );
 
     this.paymentsGateway.emitPaymentProcessing(String(user._id));
-    await this.notificationsService.sendBookingNotification();
 
     return {
       paymentId: String(payment._id),
@@ -309,31 +349,52 @@ export class PaymentsService implements OnModuleInit {
   }
 
   async verifyRazorpayPayment(dto: VerifyRazorpayPaymentDto) {
-    const payment = await this.paymentModel.findOne({ razorpayOrderId: dto.razorpayOrderId, bookingId: dto.bookingId });
+    const payment = await this.paymentModel.findOne({
+      razorpayOrderId: dto.razorpayOrderId,
+      bookingId: dto.bookingId,
+    });
     if (!payment) {
       throw new BadRequestException("Payment record not found.");
     }
 
     const expectedSignature = crypto
-      .createHmac("sha256", this.configService.get<string>("razorpayKeySecret") || "")
+      .createHmac(
+        "sha256",
+        this.configService.get<string>("razorpayKeySecret") || "",
+      )
       .update(`${dto.razorpayOrderId}|${dto.razorpayPaymentId}`)
       .digest("hex");
 
     if (expectedSignature !== dto.razorpaySignature) {
-      await this.paymentModel.updateOne({ _id: payment._id }, { $set: { paymentStatus: "failed", failureReason: "Invalid signature" } });
+      await this.paymentModel.updateOne(
+        { _id: payment._id },
+        {
+          $set: { paymentStatus: "failed", failureReason: "Invalid signature" },
+        },
+      );
       await this.bookingsService.markPaymentFailed(dto.bookingId);
-      this.paymentsGateway.emitPaymentFailed(payment.userId, { paymentId: String(payment._id), reason: "Invalid signature" });
+      this.paymentsGateway.emitPaymentFailed(payment.userId, {
+        paymentId: String(payment._id),
+        reason: "Invalid signature",
+      });
       throw new BadRequestException("Invalid Razorpay signature.");
     }
 
     let fetchedPayment: any;
     try {
-      fetchedPayment = await this.requireRazorpay().payments.fetch(dto.razorpayPaymentId);
+      fetchedPayment = await this.requireRazorpay().payments.fetch(
+        dto.razorpayPaymentId,
+      );
     } catch (error) {
-      this.logger.warn(`Razorpay payment fetch failed for ${dto.razorpayPaymentId}: ${(error as Error).message}`);
+      this.logger.warn(
+        `Razorpay payment fetch failed for ${dto.razorpayPaymentId}: ${(error as Error).message}`,
+      );
     }
 
-    if (fetchedPayment?.amount && Number(fetchedPayment.amount) !== Number(payment.amount)) {
+    if (
+      fetchedPayment?.amount &&
+      Number(fetchedPayment.amount) !== Number(payment.amount)
+    ) {
       throw new BadRequestException("Payment amount mismatch.");
     }
 
@@ -382,7 +443,10 @@ export class PaymentsService implements OnModuleInit {
 
   async handleWebhook(rawBody: Buffer, signature: string) {
     const secret = this.requireWebhookSecret();
-    const computed = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+    const computed = crypto
+      .createHmac("sha256", secret)
+      .update(rawBody)
+      .digest("hex");
 
     if (computed !== signature) {
       throw new BadRequestException("Invalid webhook signature");
@@ -405,7 +469,12 @@ export class PaymentsService implements OnModuleInit {
         ],
       }));
 
-    if (targetPayment && targetPayment.webhookEvents.some((entry: { eventId: string }) => entry.eventId === eventId)) {
+    if (
+      targetPayment &&
+      targetPayment.webhookEvents.some(
+        (entry: { eventId: string }) => entry.eventId === eventId,
+      )
+    ) {
       return { ok: true, duplicate: true };
     }
 
@@ -419,21 +488,33 @@ export class PaymentsService implements OnModuleInit {
       await targetPayment.save();
     }
 
-    if (eventName === "payment.authorized" || eventName === "payment.captured" || eventName === "invoice.paid") {
+    if (
+      eventName === "payment.authorized" ||
+      eventName === "payment.captured" ||
+      eventName === "invoice.paid"
+    ) {
       if (targetPayment) {
         targetPayment.paymentStatus = "captured";
-        targetPayment.razorpayPaymentId = paymentEntity?.id || targetPayment.razorpayPaymentId;
+        targetPayment.razorpayPaymentId =
+          paymentEntity?.id || targetPayment.razorpayPaymentId;
         targetPayment.transactionDate = new Date().toISOString();
         await targetPayment.save();
         await this.bookingsService.markPaymentPaid(targetPayment.bookingId, {
           razorpayOrderId: targetPayment.razorpayOrderId,
           razorpayPaymentId: targetPayment.razorpayPaymentId,
           paymentId: String(targetPayment._id),
-          razorpaySubscriptionId: targetPayment.razorpaySubscriptionId || undefined,
+          razorpaySubscriptionId:
+            targetPayment.razorpaySubscriptionId || undefined,
         });
         await this.userModel.updateOne(
           { _id: targetPayment.userId },
-          { $set: { lastPaymentStatus: "paid", accessAllowed: true, lastSyncedAt: new Date() } },
+          {
+            $set: {
+              lastPaymentStatus: "paid",
+              accessAllowed: true,
+              lastSyncedAt: new Date(),
+            },
+          },
         );
         this.paymentsGateway.emitPaymentSuccess(targetPayment.userId, {
           paymentId: targetPayment.razorpayPaymentId,
@@ -448,15 +529,27 @@ export class PaymentsService implements OnModuleInit {
     if (eventName === "payment.failed") {
       if (targetPayment) {
         targetPayment.paymentStatus = "failed";
-        targetPayment.failureReason = paymentEntity?.error_description || paymentEntity?.error_reason || "Payment failed";
+        targetPayment.failureReason =
+          paymentEntity?.error_description ||
+          paymentEntity?.error_reason ||
+          "Payment failed";
         await targetPayment.save();
         await this.bookingsService.markPaymentFailed(targetPayment.bookingId);
         await this.userModel.updateOne(
           { _id: targetPayment.userId },
-          { $set: { lastPaymentStatus: "failed", accessAllowed: false, lastSyncedAt: new Date() } },
+          {
+            $set: {
+              lastPaymentStatus: "failed",
+              accessAllowed: false,
+              lastSyncedAt: new Date(),
+            },
+          },
         );
         this.paymentsGateway.emitPaymentFailed(targetPayment.userId, {
-          paymentId: targetPayment.razorpayPaymentId || paymentEntity?.id || String(targetPayment._id),
+          paymentId:
+            targetPayment.razorpayPaymentId ||
+            paymentEntity?.id ||
+            String(targetPayment._id),
           reason: targetPayment.failureReason,
         });
       }
@@ -465,7 +558,9 @@ export class PaymentsService implements OnModuleInit {
     if (eventName.startsWith("subscription.")) {
       const subscriptionId = subscriptionEntity?.id;
       if (subscriptionId) {
-        let subscription = await this.subscriptionModel.findOne({ razorpaySubscriptionId: subscriptionId });
+        let subscription = await this.subscriptionModel.findOne({
+          razorpaySubscriptionId: subscriptionId,
+        });
         if (!subscription) {
           subscription = await this.subscriptionModel.create({
             subscriptionId,
@@ -487,16 +582,29 @@ export class PaymentsService implements OnModuleInit {
                 : eventName === "subscription.pending"
                   ? "pending"
                   : "active";
-        subscription.accessAllowed = !["halted", "cancelled", "expired"].includes(subscription.status);
-        subscription.currentPeriodEnd = subscriptionEntity?.current_end ? new Date(subscriptionEntity.current_end * 1000) : subscription.currentPeriodEnd;
-        subscription.nextBillingDate = subscriptionEntity?.charge_at ? new Date(subscriptionEntity.charge_at * 1000) : subscription.nextBillingDate;
+        subscription.accessAllowed = ![
+          "halted",
+          "cancelled",
+          "expired",
+        ].includes(subscription.status);
+        subscription.currentPeriodEnd = subscriptionEntity?.current_end
+          ? new Date(subscriptionEntity.current_end * 1000)
+          : subscription.currentPeriodEnd;
+        subscription.nextBillingDate = subscriptionEntity?.charge_at
+          ? new Date(subscriptionEntity.charge_at * 1000)
+          : subscription.nextBillingDate;
         await subscription.save();
 
         await this.userModel.updateOne(
           { _id: subscription.userId },
           {
             $set: {
-              planStatus: subscription.status === "active" ? "active" : subscription.status === "pending" ? "past_due" : subscription.status,
+              planStatus:
+                subscription.status === "active"
+                  ? "active"
+                  : subscription.status === "pending"
+                    ? "past_due"
+                    : subscription.status,
               accessAllowed: subscription.accessAllowed,
               currentPeriodEnd: subscription.currentPeriodEnd,
               nextBillingDate: subscription.nextBillingDate,
@@ -507,13 +615,21 @@ export class PaymentsService implements OnModuleInit {
         );
 
         if (subscription.accessAllowed) {
-          this.paymentsGateway.emitSubscriptionUpdated(String(subscription.userId), {
-            planStatus: subscription.status,
-            currentPeriodEnd: subscription.currentPeriodEnd?.toISOString() || null,
-            nextBillingDate: subscription.nextBillingDate?.toISOString() || null,
-          });
+          this.paymentsGateway.emitSubscriptionUpdated(
+            String(subscription.userId),
+            {
+              planStatus: subscription.status,
+              currentPeriodEnd:
+                subscription.currentPeriodEnd?.toISOString() || null,
+              nextBillingDate:
+                subscription.nextBillingDate?.toISOString() || null,
+            },
+          );
         } else {
-          this.paymentsGateway.emitSubscriptionExpired(String(subscription.userId), { reason: `subscription.${eventName.split(".")[1]}` });
+          this.paymentsGateway.emitSubscriptionExpired(
+            String(subscription.userId),
+            { reason: `subscription.${eventName.split(".")[1]}` },
+          );
         }
       }
     }
@@ -522,7 +638,13 @@ export class PaymentsService implements OnModuleInit {
       if (targetPayment) {
         await this.userModel.updateOne(
           { _id: targetPayment.userId },
-          { $set: { accessAllowed: false, planStatus: "past_due", lastPaymentStatus: "failed" } },
+          {
+            $set: {
+              accessAllowed: false,
+              planStatus: "past_due",
+              lastPaymentStatus: "failed",
+            },
+          },
         );
       }
     }
@@ -538,7 +660,9 @@ export class PaymentsService implements OnModuleInit {
   @Cron("0 2 * * *")
   async reconcileSubscriptions() {
     if (!this.razorpay) {
-      this.logger.warn("Skipping subscription reconciliation because Razorpay is not configured.");
+      this.logger.warn(
+        "Skipping subscription reconciliation because Razorpay is not configured.",
+      );
       return;
     }
 
@@ -549,14 +673,22 @@ export class PaymentsService implements OnModuleInit {
 
     for (const subscription of activeSubscriptions) {
       try {
-        const remote = await this.requireRazorpay().subscriptions.fetch(subscription.razorpaySubscriptionId);
-        const nextBillingDate = remote.charge_at ? new Date(remote.charge_at * 1000) : subscription.nextBillingDate;
-        const currentPeriodEnd = remote.current_end ? new Date(remote.current_end * 1000) : subscription.currentPeriodEnd;
+        const remote = await this.requireRazorpay().subscriptions.fetch(
+          subscription.razorpaySubscriptionId,
+        );
+        const nextBillingDate = remote.charge_at
+          ? new Date(remote.charge_at * 1000)
+          : subscription.nextBillingDate;
+        const currentPeriodEnd = remote.current_end
+          ? new Date(remote.current_end * 1000)
+          : subscription.currentPeriodEnd;
         const status = remote.status as Subscription["status"];
         subscription.status = status;
         subscription.nextBillingDate = nextBillingDate || null;
         subscription.currentPeriodEnd = currentPeriodEnd || null;
-        subscription.accessAllowed = ["active", "authenticated"].includes(remote.status);
+        subscription.accessAllowed = ["active", "authenticated"].includes(
+          remote.status,
+        );
         await subscription.save();
 
         await this.userModel.updateOne(
@@ -572,11 +704,16 @@ export class PaymentsService implements OnModuleInit {
           },
         );
 
-        this.paymentsGateway.emitSubscriptionUpdated(String(subscription.userId), {
-          planStatus: subscription.status,
-          currentPeriodEnd: subscription.currentPeriodEnd?.toISOString() || null,
-          nextBillingDate: subscription.nextBillingDate?.toISOString() || null,
-        });
+        this.paymentsGateway.emitSubscriptionUpdated(
+          String(subscription.userId),
+          {
+            planStatus: subscription.status,
+            currentPeriodEnd:
+              subscription.currentPeriodEnd?.toISOString() || null,
+            nextBillingDate:
+              subscription.nextBillingDate?.toISOString() || null,
+          },
+        );
       } catch (error) {
         this.logger.warn(
           `Failed to reconcile subscription ${subscription.razorpaySubscriptionId}: ${(error as Error).message}`,

@@ -1,0 +1,134 @@
+@import url("/theme1/styles/bootstrap-4.1.2/bootstrap.min.css");
+@import url("/theme1/plugins/font-awesome-4.7.0/css/font-awesome.min.css");
+@import url("/theme1/plugins/OwlCarousel2-2.2.1/owl.carousel.css");
+@import url("/theme1/plugins/OwlCarousel2-2.2.1/owl.theme.default.css");
+@import url("/theme1/plugins/OwlCarousel2-2.2.1/animate.css");
+@import url("/theme1/plugins/colorbox/colorbox.css");
+@import url("/theme1/plugins/jquery-datepicker/jquery-ui.css");
+@import url("/theme1/plugins/jquery-timepicker/jquery.timepicker.css");
+@import url("/theme1/styles/main_styles.css");
+@import url("/theme1/styles/responsive.css");
+@import url("/theme1/styles/about.css");
+@import url("/theme1/styles/about_responsive.css");
+@import url("/theme1/styles/menu.css");
+@import url("/theme1/styles/menu_responsive.css");
+@import url("/theme1/styles/blog.css");
+@import url("/theme1/styles/blog_responsive.css");
+@import url("/theme1/styles/contact.css");
+@import url("/theme1/styles/contact_responsive.css");
+@import url("/theme1/styles/elements.css");
+@import url("/theme1/styles/elements_responsive.css");
+
+.theme_link_button,
+.header_reservation_cta,
+.menu_reservation_cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.theme_link_button {
+  line-height: 48px;
+}
+
+.header_reservation_cta,
+.menu_reservation_cta {
+  min-width: 190px;
+  min-height: 47px;
+  padding: 0 22px;
+  border: 2px solid #c4ab9f;
+  color: #ffffff;
+  font-size: 16px;
+  transition: all 200ms ease;
+}
+
+.header_reservation_cta:hover,
+.menu_reservation_cta:hover {
+  background: #c4ab9f;
+  color: #ffffff;
+}
+
+.res_form_single {
+  display: flex;
+  justify-content: center;
+}
+
+.home_reservation_button {
+  margin-top: 24px;
+}
+
+.landing_location_button a {
+  color: #4a4a4a;
+}
+
+.contact_reservation_button a {
+  color: #4a4a4a;
+}
+
+.contact_list_icon {
+  min-width: 24px;
+  margin-right: 14px;
+  color: #c4ab9f;
+  font-size: 18px;
+  line-height: 1.4;
+}
+
+.footer_contact_icon {
+  min-width: 24px;
+  margin-right: 14px;
+  color: #c4ab9f;
+  font-size: 18px;
+  line-height: 1.4;
+}
+
+.contact_map iframe {
+  width: 100%;
+  min-height: 450px;
+  border: 0;
+}
+
+.theme1-site .booking_theme_page {
+  padding-top: 150px;
+  padding-bottom: 40px;
+}
+
+.theme1-site .header.booking_header {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.theme1-site .header.booking_header .header_content {
+  height: 110px;
+}
+
+.theme1-site .hamburger_bar.booking_header {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.theme1-site .booking_theme_hero,
+.theme1-site .booking_theme_page .lux-panel,
+.theme1-site .booking_theme_page .lux-panel-strong {
+  border: 1px solid rgba(196, 171, 159, 0.32);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 249, 244, 0.96),
+      rgba(255, 241, 233, 0.9)
+    ),
+    rgba(255, 255, 255, 0.72);
+  box-shadow: 0 18px 45px -18px rgba(35, 26, 19, 0.2);
+}
+
+.theme1-site .booking_theme_hero {
+  border-radius: 32px;
+}
+
+.theme1-site .booking_theme_page .lux-heading {
+  letter-spacing: 0;
+}
+
+.theme1-site .booking_theme_page textarea,
+.theme1-site .booking_theme_page input,
+.theme1-site .booking_theme_page select {
+  border-radius: 16px;
+}

@@ -11,10 +11,38 @@ import { NotificationsService } from "../notifications/notifications.service";
 @Injectable()
 export class BookingsService {
   constructor(
-    @InjectModel(Booking.name) private readonly bookingModel: Model<BookingDocument>,
+    @InjectModel(Booking.name)
+    private readonly bookingModel: Model<BookingDocument>,
     private readonly slotsService: SlotsService,
     private readonly notificationsService: NotificationsService,
   ) {}
+
+  private async deliverWhatsAppConfirmation(payload: {
+    bookingId: string;
+    customerName: string;
+    phone: string;
+    date: string;
+    time: string;
+    pax: number;
+    totalAmount: number;
+    qrCode: string;
+  }) {
+    const notification =
+      await this.notificationsService.sendBookingNotification(payload);
+
+    await this.bookingModel.updateOne(
+      { bookingId: payload.bookingId },
+      {
+        $set: {
+          whatsappNotificationStatus: notification.status,
+          whatsappMessageIds: notification.messageIds,
+          whatsappNotificationSentAt:
+            notification.status === "sent_to_meta" ? new Date() : null,
+          whatsappNotificationError: notification.error || "",
+        },
+      },
+    );
+  }
 
   private buildQrPayload(booking: {
     bookingId: string;
@@ -25,7 +53,9 @@ export class BookingsService {
   }) {
     const signature = crypto
       .createHmac("sha256", process.env.JWT_SECRET || "karali")
-      .update(`${booking.bookingId}:${booking.customerName}:${booking.date}:${booking.time}:${booking.pax}`)
+      .update(
+        `${booking.bookingId}:${booking.customerName}:${booking.date}:${booking.time}:${booking.pax}`,
+      )
       .digest("hex");
 
     return {
@@ -127,10 +157,16 @@ export class BookingsService {
     totalAmount?: number;
   }) {
     const finalAmount = dto.totalAmount || 0;
-    const slotAvailability = await this.slotsService.slots(dto.slotId.slice(0, 10));
-    const selectedSlot = slotAvailability.slots.find((slot) => slot.time === dto.slotId.slice(11));
+    const slotAvailability = await this.slotsService.slots(
+      dto.slotId.slice(0, 10),
+    );
+    const selectedSlot = slotAvailability.slots.find(
+      (slot) => slot.time === dto.slotId.slice(11),
+    );
     if (!selectedSlot?.available) {
-      throw new BadRequestException(selectedSlot?.reason || "Selected slot is unavailable");
+      throw new BadRequestException(
+        selectedSlot?.reason || "Selected slot is unavailable",
+      );
     }
 
     const bookingId = `KR-${randomInt(1000, 9999)}`;
@@ -162,13 +198,14 @@ export class BookingsService {
       }),
     });
 
-    await this.notificationsService.sendBookingNotification({
+    await this.deliverWhatsAppConfirmation({
       bookingId,
       customerName: dto.customerName || "Guest",
       phone: dto.phone || "",
       date,
       time,
       pax: dto.pax,
+      totalAmount: finalAmount,
       qrCode: created.qrCode,
     });
 
@@ -191,14 +228,22 @@ export class BookingsService {
     paymentId?: string;
     razorpaySubscriptionId?: string;
   }) {
-    const slotAvailability = await this.slotsService.slots(dto.slotId.slice(0, 10));
-    const selectedSlot = slotAvailability.slots.find((slot) => slot.time === dto.slotId.slice(11));
+    const slotAvailability = await this.slotsService.slots(
+      dto.slotId.slice(0, 10),
+    );
+    const selectedSlot = slotAvailability.slots.find(
+      (slot) => slot.time === dto.slotId.slice(11),
+    );
     if (!selectedSlot?.available) {
-      throw new BadRequestException(selectedSlot?.reason || "Selected slot is unavailable");
+      throw new BadRequestException(
+        selectedSlot?.reason || "Selected slot is unavailable",
+      );
     }
 
     if (dto.bookingId) {
-      const existingByBookingId = await this.bookingModel.findOne({ bookingId: dto.bookingId }).lean();
+      const existingByBookingId = await this.bookingModel
+        .findOne({ bookingId: dto.bookingId })
+        .lean();
       if (existingByBookingId) {
         return this.toResponse(existingByBookingId as BookingDocument);
       }
@@ -236,38 +281,33 @@ export class BookingsService {
       }),
     });
 
-    await this.notificationsService.sendBookingNotification({
-      bookingId,
-      customerName: dto.customerName || "Guest",
-      phone: dto.phone || "",
-      date,
-      time,
-      pax: dto.pax,
-      qrCode: created.qrCode,
-    });
-
     return this.toResponse(created as BookingDocument);
   }
 
   async markPaymentPaid(
     bookingId: string,
-    payload: { razorpayOrderId: string; razorpayPaymentId: string; razorpaySubscriptionId?: string; paymentId?: string },
+    payload: {
+      razorpayOrderId: string;
+      razorpayPaymentId: string;
+      razorpaySubscriptionId?: string;
+      paymentId?: string;
+    },
   ) {
     const updated = await this.bookingModel
       .findOneAndUpdate(
         { bookingId },
-      {
-        $set: {
-          paymentStatus: "paid",
-          status: "confirmed",
-          razorpayOrderId: payload.razorpayOrderId,
-          razorpayPaymentId: payload.razorpayPaymentId,
-          razorpaySubscriptionId: payload.razorpaySubscriptionId || "",
-          paymentId: payload.paymentId || "",
+        {
+          $set: {
+            paymentStatus: "paid",
+            status: "confirmed",
+            razorpayOrderId: payload.razorpayOrderId,
+            razorpayPaymentId: payload.razorpayPaymentId,
+            razorpaySubscriptionId: payload.razorpaySubscriptionId || "",
+            paymentId: payload.paymentId || "",
+          },
         },
-      },
-      { new: true },
-    )
+        { new: true },
+      )
       .lean();
 
     if (updated && !updated.qrCode) {
@@ -282,7 +322,27 @@ export class BookingsService {
       updated.qrCode = qrCode as never;
     }
 
-    return this.toResponse(updated as BookingDocument | null);
+    const response = this.toResponse(updated as BookingDocument | null);
+
+    if (
+      response &&
+      response.status === "confirmed" &&
+      response.paymentStatus === "paid" &&
+      (updated?.whatsappNotificationStatus || "pending") !== "sent_to_meta"
+    ) {
+      await this.deliverWhatsAppConfirmation({
+        bookingId: response.bookingId,
+        customerName: response.customerName,
+        phone: response.phone,
+        date: response.date,
+        time: response.time,
+        pax: response.pax,
+        totalAmount: response.totalAmount,
+        qrCode: response.qrCode,
+      });
+    }
+
+    return response;
   }
 
   async markPaymentFailed(bookingId: string) {
