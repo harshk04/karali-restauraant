@@ -11,6 +11,15 @@ export class Closure {
   @Prop({ required: true })
   endDate!: string;
 
+  @Prop({ default: true })
+  entireDay!: boolean;
+
+  @Prop({ default: "" })
+  startTime!: string;
+
+  @Prop({ default: "" })
+  endTime!: string;
+
   @Prop({ default: "" })
   reason!: string;
 

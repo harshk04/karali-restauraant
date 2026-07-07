@@ -67,8 +67,21 @@ class ClosureDto {
   @IsString()
   startDate!: string;
 
+  @IsOptional()
   @IsString()
-  endDate!: string;
+  endDate?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  entireDay?: boolean;
+
+  @IsOptional()
+  @IsString()
+  startTime?: string;
+
+  @IsOptional()
+  @IsString()
+  endTime?: string;
 
   @IsOptional()
   @IsString()
@@ -273,6 +286,11 @@ export class AdminController {
   @Post("availability/closures")
   closure(@Body() dto: ClosureDto) {
     return this.adminService.createClosure(dto);
+  }
+
+  @Patch("availability/closures/:closureId/undo")
+  undoClosure(@Param("closureId") closureId: string) {
+    return this.adminService.undoClosure(closureId);
   }
 
   @Post("coupons")

@@ -146,16 +146,61 @@ export class AdminService {
 
   async createClosure(payload: {
     startDate: string;
-    endDate: string;
+    endDate?: string;
+    entireDay?: boolean;
+    startTime?: string;
+    endTime?: string;
     reason?: string;
     displayReasonToCustomers?: boolean;
   }) {
+    const startDate = String(payload.startDate || "").trim();
+    const endDate = String(payload.endDate || payload.startDate || "").trim();
+    const entireDay = payload.entireDay ?? true;
+    const startTime = entireDay ? "" : String(payload.startTime || "").trim();
+    const endTime = entireDay ? "" : String(payload.endTime || "").trim();
+
+    if (!startDate) {
+      throw new BadRequestException("Start date is required.");
+    }
+    if (!endDate) {
+      throw new BadRequestException("End date is required.");
+    }
+    if (startDate > endDate) {
+      throw new BadRequestException("Start date must be before end date.");
+    }
+    if (!entireDay) {
+      if (!startTime || !endTime) {
+        throw new BadRequestException("Start and end time are required for partial closures.");
+      }
+      if (startTime >= endTime) {
+        throw new BadRequestException("Start time must be before end time.");
+      }
+    }
+
     return this.closureModel.create({
-      ...payload,
+      startDate,
+      endDate,
+      entireDay,
+      startTime,
+      endTime,
       reason: payload.reason || "",
       displayReasonToCustomers: Boolean(payload.displayReasonToCustomers),
       active: true,
     });
+  }
+
+  async undoClosure(closureId: string) {
+    const closure = await this.closureModel.findByIdAndUpdate(
+      closureId,
+      { $set: { active: false } },
+      { new: true },
+    ).lean();
+
+    if (!closure) {
+      throw new NotFoundException("Closure not found.");
+    }
+
+    return closure;
   }
 
   async createCoupon(payload: Partial<Coupon>) {

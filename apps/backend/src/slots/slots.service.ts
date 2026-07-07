@@ -28,7 +28,7 @@ export class SlotsService {
 
   private async getDateState(date: string) {
     const closures = await this.closureModel.find({ active: true }).lean();
-    const closure = closures.find((item) => this.isDateInRange(date, item.startDate, item.endDate));
+    const closure = closures.find((item) => item.entireDay !== false && this.isDateInRange(date, item.startDate, item.endDate));
     if (closure) {
       return {
         status: "closed",
@@ -69,6 +69,7 @@ export class SlotsService {
   async slots(date: string) {
     const timing = await this.getTiming();
     const closureState = await this.getDateState(date);
+    const closures = await this.closureModel.find({ active: true }).lean();
     const availability = await this.availabilityModel.findOne({ scope: "date", date, active: true }).lean();
     const blockedSlots = new Set([
       ...(availability?.blockedSlots || []),
@@ -79,6 +80,23 @@ export class SlotsService {
       return acc;
     }, {});
     const maxBookingsPerSlot = availability?.maxBookingsPerSlot || 6;
+
+    const isBlockedByClosure = (time: string) =>
+      closures.some((item) => {
+        if (!this.isDateInRange(date, item.startDate, item.endDate)) {
+          return false;
+        }
+
+        if (item.entireDay !== false) {
+          return true;
+        }
+
+        if (!item.startTime || !item.endTime) {
+          return false;
+        }
+
+        return time >= item.startTime && time < item.endTime;
+      });
 
     if (closureState.status === "closed") {
       return {
@@ -105,12 +123,19 @@ export class SlotsService {
       closeTime,
       slots: DEFAULT_TIMES.filter((time) => time >= openTime && time <= closeTime).map((time) => {
         const bookings = counts[time] || 0;
-        const available = !blockedSlots.has(time) && bookings < maxBookingsPerSlot;
+        const blockedByClosure = isBlockedByClosure(time);
+        const available = !blockedSlots.has(time) && !blockedByClosure && bookings < maxBookingsPerSlot;
         return {
           time,
           label: this.toSlotLabel(time),
           available,
-          reason: blockedSlots.has(time) ? "Blocked by admin" : bookings >= maxBookingsPerSlot ? "Fully booked" : "",
+          reason: blockedSlots.has(time)
+            ? "Blocked by admin"
+            : blockedByClosure
+              ? "Unavailable"
+              : bookings >= maxBookingsPerSlot
+                ? "Fully booked"
+                : "",
           bookings,
           maxBookingsPerSlot,
         };
