@@ -23,6 +23,22 @@
   box-sizing: border-box;
 }
 
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
 html {
   scroll-behavior: smooth;
 }

@@ -299,7 +299,7 @@ export class BookingsService {
       status: "pending",
       paymentStatus: "pending",
       specialRequest: dto.specialRequest || "",
-      paymentMethod: dto.paymentMethod || "razorpay",
+      paymentMethod: "pay_later",
       couponCode: dto.couponCode || "",
       discountAmount: dto.discountAmount || 0,
       totalAmount: dto.totalAmount || 0,

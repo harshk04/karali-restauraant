@@ -123,7 +123,19 @@ export class AdminService {
     if (status === "cancelled") payload.cancelledAt = new Date();
     const booking = await this.bookingModel.findOneAndUpdate({ bookingId }, { $set: payload }, { new: true }).lean();
     if (booking && status === "checked_in") {
-      await this.checkinModel.updateOne({ bookingId }, { $set: { bookingId, staffId: "admin", status: "checked_in", checkedInAt: new Date() } }, { upsert: true });
+      await this.checkinModel.updateOne(
+        { bookingId },
+        {
+          $set: {
+            bookingId,
+            staffId: "admin",
+            checkedInByStaffId: "admin",
+            status: "checked_in",
+            checkedInAt: new Date(),
+          },
+        },
+        { upsert: true },
+      );
     }
     return booking;
   }
@@ -355,7 +367,15 @@ export class AdminService {
     const booking = await this.markBooking(payload.bookingId, "checked_in");
     await this.checkinModel.updateOne(
       { bookingId: payload.bookingId },
-      { $set: { bookingId: payload.bookingId, staffId: payload.staffId, status: "checked_in", checkedInAt: new Date() } },
+      {
+        $set: {
+          bookingId: payload.bookingId,
+          staffId: payload.staffId,
+          checkedInByStaffId: payload.staffId,
+          status: "checked_in",
+          checkedInAt: new Date(),
+        },
+      },
       { upsert: true },
     );
     return booking;

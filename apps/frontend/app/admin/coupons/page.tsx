@@ -67,6 +67,43 @@ function toForm(coupon: CouponRecord): CouponForm {
   };
 }
 
+function ToggleSwitch({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={`flex items-center justify-between gap-4 rounded-2xl border px-4 py-3 text-sm transition ${
+        checked
+          ? "border-[#8f4a00] bg-[#fff4eb] text-[#231a13]"
+          : "border-[#efd9c8] bg-white text-[#554336]"
+      }`}
+    >
+      <span>{label}</span>
+      <span
+        className={`relative inline-flex h-7 w-12 items-center rounded-full transition ${
+          checked ? "bg-[#8f4a00]" : "bg-[#ccb7a6]"
+        }`}
+      >
+        <span
+          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+            checked ? "translate-x-6" : "translate-x-1"
+          }`}
+        />
+      </span>
+    </button>
+  );
+}
+
 export default function CouponsPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
@@ -346,17 +383,13 @@ export default function CouponsPage() {
               }
               placeholder="Maximum discount"
             />
-            <label className="flex items-center gap-3 rounded-2xl border border-[#efd9c8] bg-white px-4 py-3 text-sm text-[#231a13] md:col-span-2">
-              <input
+            <div className="md:col-span-2">
+              <ToggleSwitch
                 checked={form.active}
-                className="h-4 w-4 accent-[#8f4a00]"
-                type="checkbox"
-                onChange={(event) =>
-                  setForm({ ...form, active: event.target.checked })
-                }
+                label={form.active ? "Coupon enabled" : "Coupon disabled"}
+                onChange={(value) => setForm({ ...form, active: value })}
               />
-              Active coupon
-            </label>
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-3">

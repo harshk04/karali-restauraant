@@ -132,3 +132,246 @@
 .theme1-site .booking_theme_page select {
   border-radius: 16px;
 }
+
+.theme1-site {
+  overflow-x: hidden;
+}
+
+.theme1-site img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.theme1-site .container {
+  width: min(1140px, calc(100vw - 2rem));
+  max-width: none;
+}
+
+.theme1-site .row {
+  margin-left: -0.75rem;
+  margin-right: -0.75rem;
+}
+
+.theme1-site [class*="col-"] {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+@media (max-width: 991px) {
+  .theme1-site .main_nav,
+  .theme1-site .reservations_phone {
+    display: none;
+  }
+
+  .theme1-site .header_content,
+  .theme1-site .header.scrolled .header_content {
+    height: 80px;
+  }
+
+  .theme1-site .hamburger_bar {
+    right: 0;
+    height: 80px;
+  }
+
+  .theme1-site .menu {
+    width: 100vw;
+  }
+
+  .theme1-site .menu_content {
+    padding-inline: 1rem;
+  }
+
+  .theme1-site .home,
+  .theme1-site .reservations {
+    min-height: auto;
+  }
+
+  .theme1-site .home_container,
+  .theme1-site .reservations_content,
+  .theme1-site .sig_content,
+  .theme1-site .themenu_title_bar_container,
+  .theme1-site .footer .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .theme1-site .home_content,
+  .theme1-site .intro_content,
+  .theme1-site .sig_content,
+  .theme1-site .themenu_col,
+  .theme1-site .reservations_content {
+    width: 100%;
+  }
+
+  .theme1-site .sig_image img {
+    width: 100%;
+    height: auto;
+  }
+
+  .theme1-site .sig_content_list ul {
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+  }
+
+  .theme1-site .footer .row {
+    row-gap: 2rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .theme1-site .home {
+    height: auto;
+    min-height: 500px;
+  }
+
+  .theme1-site .home_container {
+    padding-top: 7rem;
+    padding-bottom: 6rem;
+  }
+
+  .theme1-site .home_subtitle,
+  .theme1-site .intro_subtitle,
+  .theme1-site .sig_subtitle,
+  .theme1-site .res_stars,
+  .theme1-site .themenu_stars {
+    font-size: 1.75rem;
+  }
+
+  .theme1-site .home_title h1,
+  .theme1-site .intro_title h2,
+  .theme1-site .sig_title h1,
+  .theme1-site .themenu_title,
+  .theme1-site .res_title {
+    font-size: 2.1rem;
+    line-height: 1.08;
+  }
+
+  .theme1-site .intro_content {
+    padding-left: 0;
+    margin-bottom: 2.5rem;
+  }
+
+  .theme1-site .sig_content {
+    padding: 2rem 1rem 2.5rem;
+  }
+
+  .theme1-site .sig_name_container {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .theme1-site .sig_name,
+  .theme1-site .sig_price {
+    font-size: 1.25rem;
+  }
+
+  .theme1-site .themenu_column:not(:last-child),
+  .theme1-site .footer_col:not(:last-child) {
+    margin-bottom: 2.5rem;
+  }
+
+  .theme1-site .reservations .home_text,
+  .theme1-site .reservations .res_form_container {
+    width: 100%;
+  }
+
+  .theme1-site .res_input,
+  .theme1-site .res_select {
+    width: 100%;
+  }
+
+  .theme1-site .menu a,
+  .theme1-site .menu_reservation_cta {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 575px) {
+  .theme1-site .header_content,
+  .theme1-site .header.scrolled .header_content,
+  .theme1-site .hamburger_bar,
+  .theme1-site .hamburger_bar.scrolled {
+    height: 72px;
+  }
+
+  .theme1-site .home_container {
+    top: 36%;
+    padding-top: 6.5rem;
+  }
+
+  .theme1-site .home_subtitle,
+  .theme1-site .intro_subtitle,
+  .theme1-site .sig_subtitle,
+  .theme1-site .res_stars,
+  .theme1-site .themenu_stars {
+    font-size: 1.4rem;
+  }
+
+  .theme1-site .home_title h1,
+  .theme1-site .intro_title h2,
+  .theme1-site .sig_title h1,
+  .theme1-site .themenu_title,
+  .theme1-site .res_title {
+    font-size: 1.9rem;
+  }
+
+  .theme1-site .home_text,
+  .theme1-site .intro_text,
+  .theme1-site .sig_text,
+  .theme1-site .reservations .home_text,
+  .theme1-site .footer_about {
+    width: 100%;
+  }
+
+  .theme1-site .home_intro_block .intro_content,
+  .theme1-site .about_intro_block .intro_content,
+  .theme1-site .home_highlights .themenu_title_bar_container,
+  .theme1-site .home_highlights .themenu_text {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .theme1-site .home_highlights .themenu_title {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .theme1-site .home_reservation_button {
+    margin-bottom: 56px;
+  }
+
+  .theme1-site .home_highlights .themenu_column:not(:last-child) {
+    margin-bottom: 1.25rem;
+  }
+
+  .theme1-site .home_highlights .themenu_row {
+    margin-top: 2.5rem;
+    padding-bottom: 2rem;
+  }
+
+  .theme1-site .home_highlights .themenu_col {
+    padding: 0 1rem;
+    border: 0;
+  }
+
+  .theme1-site .home_highlights .themenu_col_title {
+    display: block;
+    height: auto;
+    padding: 0;
+    border: 0;
+    line-height: 1.25;
+    margin-bottom: 0.6rem;
+    color: #c4ab9f;
+  }
+
+  .theme1-site .intro_image,
+  .theme1-site .sig_image {
+    border-radius: 22px;
+    overflow: hidden;
+  }
+
+  .theme1-site .menu_content {
+    min-height: calc(100dvh - 72px);
+  }
+}

@@ -43,7 +43,7 @@ export function HomeThemePage() {
         </div>
       </div>
 
-      <div className="intro">
+      <div className="intro home_intro_block">
         <div className="container">
           <div className="row">
             <div className="col">
@@ -158,7 +158,7 @@ export function HomeThemePage() {
         </div>
       </div>
 
-      <div className="themenu">
+      <div className="themenu home_highlights">
         <div className="container">
           <div className="row">
             <div className="col">

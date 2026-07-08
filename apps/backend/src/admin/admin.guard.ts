@@ -3,6 +3,7 @@ import { JwtService } from "@nestjs/jwt";
 import type { Request } from "express";
 
 type AdminSession = {
+  id?: string;
   email: string;
   name: string;
   mobile: string;
@@ -25,6 +26,9 @@ export class AdminAuthGuard implements CanActivate {
 
     try {
       request.admin = this.jwtService.verify<AdminSession>(token);
+      if (request.admin.role !== "admin") {
+        throw new Error("Invalid role");
+      }
       return true;
     } catch {
       throw new UnauthorizedException("Invalid admin session");

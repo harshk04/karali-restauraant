@@ -23,6 +23,8 @@ import { User, UserDocument } from "../database/schemas/user.schema";
 import { BookingsService } from "../bookings/bookings.service";
 import { PaymentsGateway } from "./payments.gateway";
 
+const RAZORPAY_PHASE_ONE_DISABLED = true;
+
 type CreateRazorpayOrderDto = {
   customerName: string;
   email?: string;
@@ -73,6 +75,13 @@ export class PaymentsService implements OnModuleInit {
   ) {}
 
   onModuleInit() {
+    if (RAZORPAY_PHASE_ONE_DISABLED) {
+      this.logger.warn(
+        "Razorpay execution is disabled for Phase 1. The endpoints remain available but inert.",
+      );
+      return;
+    }
+
     const keyId = this.configService.get<string>("razorpayKeyId");
     const keySecret = this.configService.get<string>("razorpayKeySecret");
 
@@ -212,6 +221,12 @@ export class PaymentsService implements OnModuleInit {
   }
 
   async createRazorpayOrder(dto: CreateRazorpayOrderDto) {
+    if (RAZORPAY_PHASE_ONE_DISABLED) {
+      throw new ServiceUnavailableException(
+        "Razorpay is temporarily disabled for Phase 1. Pay Later is the only active payment option.",
+      );
+    }
+
     if (!dto.customerName || !dto.slotId || !dto.amount) {
       throw new BadRequestException("Missing booking/payment details.");
     }
@@ -349,6 +364,12 @@ export class PaymentsService implements OnModuleInit {
   }
 
   async verifyRazorpayPayment(dto: VerifyRazorpayPaymentDto) {
+    if (RAZORPAY_PHASE_ONE_DISABLED) {
+      throw new ServiceUnavailableException(
+        "Razorpay is temporarily disabled for Phase 1. Pay Later is the only active payment option.",
+      );
+    }
+
     const payment = await this.paymentModel.findOne({
       razorpayOrderId: dto.razorpayOrderId,
       bookingId: dto.bookingId,
@@ -442,6 +463,12 @@ export class PaymentsService implements OnModuleInit {
   }
 
   async handleWebhook(rawBody: Buffer, signature: string) {
+    if (RAZORPAY_PHASE_ONE_DISABLED) {
+      throw new ServiceUnavailableException(
+        "Razorpay webhooks are temporarily disabled for Phase 1.",
+      );
+    }
+
     const secret = this.requireWebhookSecret();
     const computed = crypto
       .createHmac("sha256", secret)
@@ -659,6 +686,13 @@ export class PaymentsService implements OnModuleInit {
 
   @Cron("0 2 * * *")
   async reconcileSubscriptions() {
+    if (RAZORPAY_PHASE_ONE_DISABLED) {
+      this.logger.warn(
+        "Skipping subscription reconciliation because Razorpay is disabled for Phase 1.",
+      );
+      return;
+    }
+
     if (!this.razorpay) {
       this.logger.warn(
         "Skipping subscription reconciliation because Razorpay is not configured.",

@@ -46,11 +46,17 @@ export function AdminLogin({ redirectTo = "/admin" }: { redirectTo?: string }) {
   }
 
   return (
-    <Card className="lg:col-span-5 space-y-5">
+    <Card className="space-y-5 lg:col-span-5">
       <div>
-        <p className="text-xs uppercase tracking-[0.35em] text-[#8f4a00]">Admin access</p>
-        <h1 className="mt-3 text-3xl font-bold text-[#231a13]">Sign in to the admin panel</h1>
-        <p className="mt-2 text-sm text-[#554336]">Use the fixed admin credentials to access bookings, availability, and coupons.</p>
+        <p className="text-xs uppercase tracking-[0.35em] text-[#8f4a00]">
+          Admin access
+        </p>
+        <h1 className="mt-3 text-3xl font-bold text-[#231a13] sm:text-4xl">
+          Sign in to the admin panel
+        </h1>
+        <p className="mt-2 text-sm text-[#554336]">
+          Use the fixed admin credentials to access bookings, availability, and coupons.
+        </p>
       </div>
       <form className="space-y-4" onSubmit={handleSubmit}>
         <Input value={email} onChange={(event: { target: { value: string } }) => setEmail(event.target.value)} placeholder="Admin email" />

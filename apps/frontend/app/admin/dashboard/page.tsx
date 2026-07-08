@@ -1,21 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AnalyticsCard, Button, Card, DataTable } from "@karali/ui";
 import { api } from "../../../lib/api";
-
-type BookingRecord = {
-  bookingId: string;
-  customerName: string;
-  date: string;
-  time: string;
-  pax: number;
-  status: string;
-  paymentStatus: string;
-  paymentMethod: string;
-  totalAmount: number;
-};
+import { BookingDetailsModal, type BookingRecord } from "../../../features/admin/booking-details-modal";
 
 type DayPoint = {
   date: string;
@@ -27,10 +16,6 @@ type DayPoint = {
 function paymentLabel(booking: BookingRecord) {
   if (booking.paymentStatus === "paid" && booking.totalAmount > 0) {
     return `Paid · Rs. ${booking.totalAmount}`;
-  }
-
-  if (booking.paymentMethod === "razorpay") {
-    return "Payment pending";
   }
 
   return "Pay at venue";
@@ -152,6 +137,7 @@ function LineTrend({
 }
 
 export default function AdminDashboardPage() {
+  const [selectedBooking, setSelectedBooking] = useState<BookingRecord | null>(null);
   const { data: dashboard } = useQuery({
     queryKey: ["admin-dashboard"],
     queryFn: async () => (await api.get("/admin/dashboard")).data,
@@ -269,12 +255,27 @@ export default function AdminDashboardPage() {
             ]}
             rows={recentBookings.map((booking) => ({
               ...booking,
+              bookingId: (
+                <button
+                  type="button"
+                  className="font-semibold text-[#8f4a00] underline-offset-4 hover:underline"
+                  onClick={() => setSelectedBooking(booking)}
+                >
+                  {booking.bookingId}
+                </button>
+              ),
               pax: String(booking.pax),
               paymentSummary: paymentLabel(booking),
             }))}
           />
         </Card>
       </section>
+
+      <BookingDetailsModal
+        booking={selectedBooking}
+        open={Boolean(selectedBooking)}
+        onClose={() => setSelectedBooking(null)}
+      />
     </div>
   );
 }

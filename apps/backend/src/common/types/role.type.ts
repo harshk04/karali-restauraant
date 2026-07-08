@@ -1,1 +1,7 @@
-export type Role = "customer" | "reception_staff" | "manager" | "admin" | "super_admin";
+export type Role =
+  | "customer"
+  | "reception_staff"
+  | "manager"
+  | "staff"
+  | "admin"
+  | "super_admin";

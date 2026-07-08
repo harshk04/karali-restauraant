@@ -11,6 +11,9 @@ export class Checkin {
   @Prop({ required: true })
   staffId!: string;
 
+  @Prop({ default: "" })
+  checkedInByStaffId!: string;
+
   @Prop({ required: true, default: "checked_in" })
   status!: "checked_in" | "completed" | "no_show";
 

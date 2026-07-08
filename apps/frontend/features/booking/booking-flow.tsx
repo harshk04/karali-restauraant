@@ -55,16 +55,6 @@ type SlotItem = {
   bookings: number;
 };
 
-type CouponResult = {
-  coupon: {
-    code: string;
-    discountType: "percentage" | "fixed";
-    percentage: number;
-    fixedAmount: number;
-  } | null;
-  discount: number;
-};
-
 type CalendarCell = {
   iso: string;
   date: Date;
@@ -80,7 +70,11 @@ const guestSchema = z.object({
     .default(""),
   phone: z
     .string()
-    .regex(/^[+0-9()\-\s]{8,20}$/, "Enter a valid mobile number."),
+    .trim()
+    .regex(
+      /^(?:\+91\d{10}|\d{10})$/,
+      "Enter a mobile number as +91XXXXXXXXXX or XXXXXXXXXX.",
+    ),
   specialRequest: z.string().default(""),
 });
 
@@ -103,6 +97,8 @@ const stepMotion = {
   exit: { opacity: 0, y: -18 },
   transition: { duration: 0.38, ease: [0.22, 1, 0.36, 1] as const },
 };
+
+const RAZORPAY_PHASE_ONE_DISABLED = true;
 
 let razorpayScriptPromise: Promise<void> | null = null;
 
@@ -130,13 +126,6 @@ function loadRazorpayScript() {
 function toSlotId(date?: string, time?: string) {
   if (!date || !time) return "";
   return `${date}-${time}`;
-}
-
-function currency(value: number) {
-  const formatted = new Intl.NumberFormat("en-IN", {
-    maximumFractionDigits: 0,
-  }).format(value);
-  return `Rs. ${formatted}`;
 }
 
 function to12Hour(time: string) {
@@ -181,12 +170,6 @@ export function BookingFlow() {
     resetBooking,
   } = useBookingStore();
 
-  const [couponCode, setCouponCode] = useState("");
-  const [couponResult, setCouponResult] = useState<CouponResult>({
-    coupon: null,
-    discount: 0,
-  });
-  const [couponError, setCouponError] = useState("");
   const [paymentPhase, setPaymentPhase] = useState<
     "idle" | "pay_later" | "razorpay" | "verifying" | "success" | "failure"
   >("idle");
@@ -318,38 +301,14 @@ export function BookingFlow() {
     });
   }, [calendarMap, visibleMonth]);
 
-  const subtotal = useMemo(() => pax * 750, [pax]);
-  const payableAmount = Math.max(0, subtotal - couponResult.discount);
   const slotId = toSlotId(date, time);
-  const showDiscount = Boolean(couponResult.coupon);
+  const payableAmount = 0;
 
   async function selectDate(day: CalendarDay) {
     if (day.status !== "open") return;
     setDate(day.date);
     setTime("");
     setStep(2);
-  }
-
-  async function applyCoupon() {
-    setCouponError("");
-    if (!couponCode.trim()) {
-      setCouponResult({ coupon: null, discount: 0 });
-      return;
-    }
-
-    try {
-      const response = await api.get<CouponResult>("/coupons/validate", {
-        params: { code: couponCode.trim(), amount: payableAmount || subtotal },
-      });
-      if (!response.data?.coupon) {
-        setCouponError("Coupon is invalid or expired.");
-        setCouponResult({ coupon: null, discount: 0 });
-        return;
-      }
-      setCouponResult(response.data);
-    } catch {
-      setCouponError("Unable to validate coupon right now.");
-    }
   }
 
   async function saveGuest(values: GuestValues) {
@@ -373,9 +332,9 @@ export function BookingFlow() {
         pax,
         specialRequest,
         paymentMethod: "pay_later",
-        couponCode: couponResult.coupon?.code || "",
-        discountAmount: couponResult.discount,
-        totalAmount: payableAmount,
+        couponCode: "",
+        discountAmount: 0,
+        totalAmount: 0,
       });
 
       setBookingId(response.data.bookingId);
@@ -392,6 +351,14 @@ export function BookingFlow() {
   }
 
   async function payNow() {
+    // Phase 1: Razorpay remains in the codebase but is intentionally disabled.
+    // We route every booking through the existing Pay Later flow until payment
+    // is re-enabled.
+    if (RAZORPAY_PHASE_ONE_DISABLED) {
+      await bookNowPayLater();
+      return;
+    }
+
     if (!date || !time) return;
     setPaymentPhase("razorpay");
     setBookingError("");
@@ -407,7 +374,7 @@ export function BookingFlow() {
         specialRequest,
         amount: payableAmount,
         attemptId,
-        couponCode: couponResult.coupon?.code || "",
+        couponCode: "",
       });
 
       const RazorpayCheckout = (
@@ -482,9 +449,9 @@ export function BookingFlow() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div className="flex items-center justify-start">
-        <Button type="button" variant="secondary" onClick={goBack}>
+        <Button type="button" variant="secondary" onClick={goBack} className="w-full sm:w-auto">
           <ArrowLeft className="h-4 w-4" />
           {currentStep <= 1 ? "Back to Home" : "Back"}
         </Button>
@@ -492,12 +459,12 @@ export function BookingFlow() {
 
       <BookingStepper current={Math.max(0, currentStep - 1)} />
 
-      <div className="grid gap-6 lg:grid-cols-12">
+      <div className="grid gap-4 lg:grid-cols-12 xl:gap-6">
         <div className="space-y-6 lg:col-span-8">
           <AnimatePresence mode="wait">
             {currentStep <= 1 ? (
               <motion.div key="step-1" {...stepMotion}>
-                <Card className="lux-panel-strong space-y-6 p-8">
+                <Card className="lux-panel-strong space-y-6 p-4 sm:p-6 lg:p-8">
                   <div className="flex items-center justify-between">
                     <div>
                       <h2 className="lux-heading mt-2 text-3xl font-bold text-[#231a13]">
@@ -511,10 +478,10 @@ export function BookingFlow() {
                     <CalendarDays className="h-8 w-8 text-[#8f4a00]" />
                   </div>
 
-                  <div className="rounded-[32px] border border-[#ead9ca] bg-white/80 p-5">
-                    <div className="mb-5 flex items-center justify-between">
+                  <div className="rounded-[32px] border border-[#ead9ca] bg-white/80 p-3 sm:p-5">
+                    <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
                       <div>
-                        <div className="lux-heading text-2xl font-semibold text-[#231a13]">
+                        <div className="lux-heading text-xl font-semibold text-[#231a13] sm:text-2xl">
                           {format(visibleMonth, "MMMM yyyy")}
                         </div>
                       </div>
@@ -540,15 +507,15 @@ export function BookingFlow() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-7 gap-2 text-center text-xs uppercase tracking-[0.22em] text-[#7c6758]">
+                    <div className="grid grid-cols-7 gap-0.5 text-center text-[8px] uppercase tracking-[0.08em] text-[#7c6758] sm:gap-2 sm:text-xs sm:tracking-[0.22em]">
                       {weekdayLabels.map((item) => (
-                        <div key={item} className="py-2">
+                        <div key={item} className="py-1 sm:py-2">
                           {item}
                         </div>
                       ))}
                     </div>
 
-                    <div className="grid grid-cols-7 gap-2">
+                    <div className="grid grid-cols-7 gap-0.5 sm:gap-2">
                       {calendarCells.map((cell) => {
                         const isSelected = date
                           ? isSameDay(parseISO(date), cell.date)
@@ -573,7 +540,7 @@ export function BookingFlow() {
                                 : undefined
                             }
                             className={[
-                              "min-h-[96px] rounded-[24px] border p-3 text-left transition-all",
+                              "min-h-[64px] rounded-[14px] border p-1.5 text-left transition-all sm:min-h-[96px] sm:rounded-[24px] sm:p-3",
                               isSelected
                                 ? "border-[#8f4a00] bg-[#8f4a00] text-white shadow-[0_16px_30px_-18px_rgba(143,74,0,0.85)]"
                                 : "border-[#ead9ca] bg-[#fffaf7] text-[#231a13]",
@@ -585,10 +552,10 @@ export function BookingFlow() {
                               isClosed && !isSelected ? "bg-[#f8efe9]" : "",
                             ].join(" ")}
                           >
-                            <div className="flex items-start justify-between">
-                              <span className="text-sm font-semibold">
-                                {format(cell.date, "d")}
-                              </span>
+                              <div className="flex items-start justify-between">
+                                <span className="text-xs font-semibold sm:text-sm">
+                                  {format(cell.date, "d")}
+                                </span>
                               {canBook ? (
                                 <span
                                   className={`h-2.5 w-2.5 rounded-full ${
@@ -598,7 +565,7 @@ export function BookingFlow() {
                               ) : null}
                             </div>
                             <div
-                              className={`mt-7 text-xs ${
+                              className={`mt-1 hidden text-[10px] sm:mt-7 sm:block sm:text-xs ${
                                 isSelected
                                   ? "text-white/85"
                                   : "text-[#6d5a4c]"
@@ -634,7 +601,7 @@ export function BookingFlow() {
 
             {currentStep === 2 ? (
               <motion.div key="step-2" {...stepMotion}>
-                <Card className="lux-panel-strong space-y-6 p-8">
+                <Card className="lux-panel-strong space-y-6 p-4 sm:p-6 lg:p-8">
                   <div className="flex items-center justify-between">
                     <div>
                       <h2 className="lux-heading mt-2 text-3xl font-bold text-[#231a13]">
@@ -669,7 +636,7 @@ export function BookingFlow() {
                             <div className="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-[#8f4a00]/75">
                               {period}
                             </div>
-                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                               {items.map((item) => (
                                 <button
                                   key={item.time}
@@ -681,7 +648,7 @@ export function BookingFlow() {
                                     setStep(3);
                                   }}
                                   className={[
-                                    "rounded-[24px] border p-4 text-left transition-all",
+                                    "rounded-[20px] border p-4 text-left transition-all sm:rounded-[24px]",
                                     time === item.time
                                       ? "border-[#8f4a00] bg-[#8f4a00] text-white shadow-[0_16px_30px_-18px_rgba(143,74,0,0.85)]"
                                       : "border-[#ead9ca] bg-[#fffaf7] text-[#231a13]",
@@ -730,7 +697,7 @@ export function BookingFlow() {
 
             {currentStep === 3 ? (
               <motion.div key="step-3" {...stepMotion}>
-                <Card className="lux-panel-strong space-y-6 p-8">
+                <Card className="lux-panel-strong space-y-6 p-4 sm:p-6 lg:p-8">
                   <div className="flex items-center justify-between">
                     <div>
                       <h2 className="lux-heading mt-2 text-3xl font-bold text-[#231a13]">
@@ -743,7 +710,7 @@ export function BookingFlow() {
                     <Users className="h-8 w-8 text-[#8f4a00]" />
                   </div>
 
-                  <div className="flex flex-wrap gap-4">
+                  <div className="grid grid-cols-3 gap-3 sm:flex sm:flex-wrap sm:gap-4">
                     {guestOptions.map((option) => (
                       <button
                         key={option.count}
@@ -753,7 +720,7 @@ export function BookingFlow() {
                           setStep(4);
                         }}
                         className={[
-                          "flex h-16 w-16 items-center justify-center rounded-full border text-center transition-all",
+                          "flex min-h-14 w-full items-center justify-center rounded-[24px] border text-center transition-all sm:h-16 sm:w-16 sm:rounded-full",
                           pax === option.count
                             ? "border-[#8f4a00] bg-[#8f4a00] text-white shadow-[0_16px_30px_-18px_rgba(143,74,0,0.85)]"
                             : "border-[#ead9ca] bg-[#fffaf7] text-[#231a13] hover:-translate-y-0.5 hover:border-[#8f4a00]/45 hover:bg-white",
@@ -769,7 +736,7 @@ export function BookingFlow() {
 
             {currentStep === 4 ? (
               <motion.div key="step-4" {...stepMotion}>
-                <Card className="lux-panel-strong space-y-5 p-8">
+                <Card className="lux-panel-strong space-y-5 p-4 sm:p-6 lg:p-8">
                   <div>
                     <h2 className="lux-heading mt-2 text-3xl font-bold text-[#231a13]">
                       Guest information
@@ -807,8 +774,15 @@ export function BookingFlow() {
                       </label>
                       <Input
                         {...form.register("phone")}
-                        placeholder="+91 98765 43210"
+                        type="tel"
+                        inputMode="numeric"
+                        autoComplete="tel"
+                        placeholder="+919876543210 or 9876543210"
                       />
+                      <p className="mt-2 text-xs text-[#554336]/75">
+                        Use <span className="font-medium">+91 followed by 10 digits</span> or just{" "}
+                        <span className="font-medium">10 digits</span>.
+                      </p>
                     </div>
                     <div className="md:col-span-2">
                       <label className="mb-2 block text-sm font-medium text-[#231a13]">
@@ -834,7 +808,7 @@ export function BookingFlow() {
 
             {currentStep === 5 ? (
               <motion.div key="step-5" {...stepMotion}>
-                <Card className="lux-panel-strong space-y-5 p-8">
+                <Card className="lux-panel-strong space-y-5 p-4 sm:p-6 lg:p-8">
                   <div className="flex items-center justify-between">
                     <div>
                       <h2 className="lux-heading mt-2 text-3xl font-bold text-[#231a13]">
@@ -873,51 +847,6 @@ export function BookingFlow() {
                     ))}
                   </div>
 
-                  <div className="rounded-3xl border border-[#e8d9cd] bg-[#fff9f4] p-5">
-                    <label className="mb-2 block text-sm font-medium text-[#231a13]">
-                      Coupon Code
-                    </label>
-                    <div className="flex gap-3">
-                      <Input
-                        value={couponCode}
-                        onChange={(event: { target: { value: string } }) =>
-                          setCouponCode(event.target.value)
-                        }
-                        placeholder="Enter coupon code"
-                      />
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={applyCoupon}
-                      >
-                        Apply
-                      </Button>
-                    </div>
-                    {couponError ? (
-                      <p className="mt-2 text-sm text-[#b54646]">
-                        {couponError}
-                      </p>
-                    ) : null}
-                    <div className="mt-4 flex items-center justify-between text-sm text-[#554336]">
-                      <span>Subtotal</span>
-                      <span>{currency(subtotal)}</span>
-                    </div>
-                    {showDiscount ? (
-                      <div className="mt-2 flex items-center justify-between text-sm text-[#554336]">
-                        <span>Discount</span>
-                        <span>-{currency(couponResult.discount)}</span>
-                      </div>
-                    ) : null}
-                    <div className="mt-2 flex items-center justify-between text-base font-semibold text-[#231a13]">
-                      <span>Total</span>
-                      <span>{currency(payableAmount)}</span>
-                    </div>
-                    <div className="mt-4 rounded-2xl border border-[#f0dccf] bg-[#fff4ec] p-4 text-sm leading-6 text-[#6d5a4c]">
-                      This payment is a cover charge. It will be adjusted
-                      against your final restaurant bill at Karali Restaurant.
-                    </div>
-                  </div>
-
                   {bookingError ? (
                     <p className="text-sm text-[#b54646]">{bookingError}</p>
                   ) : null}
@@ -937,21 +866,23 @@ export function BookingFlow() {
                       ) : null}
                       Reserve Now (Pay Later)
                     </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={payNow}
-                      disabled={
-                        paymentPhase === "pay_later" ||
-                        paymentPhase === "razorpay" ||
-                        paymentPhase === "verifying"
-                      }
-                    >
-                      {paymentPhase === "razorpay" ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : null}
-                      Pay Cover Charge with Razorpay
-                    </Button>
+                    {RAZORPAY_PHASE_ONE_DISABLED ? null : (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={payNow}
+                        disabled={
+                          paymentPhase === "pay_later" ||
+                          paymentPhase === "razorpay" ||
+                          paymentPhase === "verifying"
+                        }
+                      >
+                        {paymentPhase === "razorpay" ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : null}
+                        Pay Cover Charge with Razorpay
+                      </Button>
+                    )}
                   </div>
                 </Card>
               </motion.div>
@@ -984,19 +915,8 @@ export function BookingFlow() {
                   <span>Guests</span>
                   <span>{getGuestDisplayLabel(pax)}</span>
                 </div>
-                {showDiscount ? (
-                  <div className="flex justify-between gap-4">
-                    <span>Coupon</span>
-                    <span>{couponResult.coupon?.code}</span>
-                  </div>
-                ) : null}
-                <div className="border-t border-[#e8d9cd] pt-4">
-                  <div className="flex justify-between text-base">
-                    <span>Amount</span>
-                    <span className="font-semibold text-[#8f4a00]">
-                      {currency(payableAmount)}
-                    </span>
-                  </div>
+                <div className="border-t border-[#e8d9cd] pt-4 text-sm text-[#554336]">
+                  
                 </div>
               </div>
             </Card>

@@ -266,7 +266,7 @@ export default function ScannerPage() {
       }
     } catch (error) {
       const message =
-      error instanceof Error
+        error instanceof Error
           ? error.message
           : "Camera access denied or unavailable.";
       setCameraStatus(message);
@@ -300,10 +300,10 @@ export default function ScannerPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="lux-hero lux-reveal p-8 md:p-10">
+    <div className="space-y-6 sm:space-y-8">
+      <div className="lux-hero lux-reveal p-4 sm:p-8 md:p-10">
         <p className="lux-eyebrow">Arrival Scan</p>
-        <h2 className="lux-heading mt-3 text-4xl font-bold text-[#231a13]">
+        <h2 className="lux-heading mt-3 text-3xl font-bold text-[#231a13] sm:text-4xl">
           Scan booking QR
         </h2>
         <p className="mt-2 text-[#554336]">
@@ -312,7 +312,7 @@ export default function ScannerPage() {
         </p>
       </div>
 
-      <Card className="space-y-4 p-8">
+      <Card className="space-y-4 p-4 sm:p-6 lg:p-8">
         <div className="flex flex-wrap items-center gap-3">
           <div
             className={[
@@ -331,18 +331,20 @@ export default function ScannerPage() {
         <div className="rounded-2xl border border-[#e8d9cd] bg-[#fffaf5] p-4 text-sm text-[#554336]">
           {cameraStatus}
         </div>
-        <video
-          ref={videoRef}
-          className="aspect-video w-full rounded-[28px] bg-black"
-          playsInline
-          muted
-          autoPlay
-        />
-        <div className="flex gap-3">
-          <Button onClick={startScan} disabled={!isSecureContext}>
+        <div className="overflow-hidden rounded-[28px] bg-black">
+          <video
+            ref={videoRef}
+            className="aspect-video w-full bg-black"
+            playsInline
+            muted
+            autoPlay
+          />
+        </div>
+        <div className="grid gap-3 sm:flex">
+          <Button onClick={startScan} disabled={!isSecureContext} className="w-full sm:w-auto">
             Retry Camera
           </Button>
-          <Button variant="secondary" onClick={stopScan}>
+          <Button variant="secondary" onClick={stopScan} className="w-full sm:w-auto">
             Stop
           </Button>
           <Button
@@ -350,6 +352,7 @@ export default function ScannerPage() {
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploadingQr}
+            className="w-full sm:w-auto"
           >
             {isUploadingQr ? "Uploading..." : "Upload QR"}
           </Button>

@@ -74,6 +74,9 @@ export class Booking {
   @Prop({ default: null, type: Date })
   checkedInAt!: Date | null;
 
+  @Prop({ default: "" })
+  checkedInByStaffId!: string;
+
   @Prop({ default: null, type: Date })
   completedAt!: Date | null;
 

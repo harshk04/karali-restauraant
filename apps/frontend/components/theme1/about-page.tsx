@@ -31,7 +31,7 @@ export function AboutThemePage() {
         </div>
       </div>
 
-      <div className="intro">
+      <div className="intro about_intro_block">
         <div className="container">
           <div className="row">
             <div className="col">
