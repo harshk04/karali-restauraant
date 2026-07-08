@@ -16,7 +16,7 @@ const items = [
     icon: <span>＋</span>,
   },
   { label: "Availability", href: "/admin/availability", icon: <span>◩</span> },
-  { label: "Coupons", href: "/admin/coupons", icon: <span>◪</span> },
+  // { label: "Coupons", href: "/admin/coupons", icon: <span>◪</span> },
   { label: "Staff Management", href: "/admin/staff-management", icon: <span>◫</span> },
   { label: "QR Scanner", href: "/admin/scanner", icon: <span>◎</span> },
 ] as const;

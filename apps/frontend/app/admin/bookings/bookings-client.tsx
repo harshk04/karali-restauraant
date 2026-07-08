@@ -561,23 +561,21 @@ export function AdminBookingsClient({
                   >
                     {actionDialog.type === "cancel" ? "Keep Booking" : "Close"}
                   </Button>
-                  {actionDialog.type !== "success-check-in" ? (
-                    <Button
-                      type="button"
-                      onClick={() => void confirmAction()}
-                      disabled={
-                        pendingAction === `${actionDialog.booking.bookingId}:check-in` ||
-                        pendingAction === `${actionDialog.booking.bookingId}:cancel`
-                      }
-                    >
-                      {pendingAction === `${actionDialog.booking.bookingId}:check-in` ||
+                  <Button
+                    type="button"
+                    onClick={() => void confirmAction()}
+                    disabled={
+                      pendingAction === `${actionDialog.booking.bookingId}:check-in` ||
                       pendingAction === `${actionDialog.booking.bookingId}:cancel`
-                        ? "Working..."
-                        : actionDialog.type === "cancel"
-                          ? "Yes, Cancel"
-                          : "Yes, Check In"}
-                    </Button>
-                  ) : null}
+                    }
+                  >
+                    {pendingAction === `${actionDialog.booking.bookingId}:check-in` ||
+                    pendingAction === `${actionDialog.booking.bookingId}:cancel`
+                      ? "Working..."
+                      : actionDialog.type === "cancel"
+                        ? "Yes, Cancel"
+                        : "Yes, Check In"}
+                  </Button>
                 </div>
               </>
             )}

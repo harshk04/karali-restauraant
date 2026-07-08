@@ -77,6 +77,17 @@ function stripHash(staff: StaffDocument | Record<string, unknown>) {
   return result;
 }
 
+function isDuplicateUsernameError(error: unknown) {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as { code?: number }).code === 11000 &&
+      "keyValue" in error &&
+      typeof (error as { keyValue?: Record<string, unknown> }).keyValue?.username === "string",
+  );
+}
+
 @Injectable()
 export class StaffService {
   constructor(
@@ -101,7 +112,7 @@ export class StaffService {
 
     const token = this.jwtService.sign(session, {
       secret: process.env.JWT_SECRET || "change-me",
-      expiresIn: "7d",
+      expiresIn: "1d",
     });
 
     return { token, session };
@@ -454,20 +465,27 @@ export class StaffService {
       throw new ConflictException("Username already exists.");
     }
 
-    const staff = await this.staffModel.create({
-      name: String(payload.name || "").trim(),
-      username,
-      passwordHash: await bcrypt.hash(password, 10),
-      mobile: String(payload.mobile || "").trim(),
-      email: String(payload.email || "").trim(),
-      designation: String(payload.designation || "").trim(),
-      role: "staff",
-      status: payload.status === "inactive" ? "inactive" : "active",
-      deletedAt: null,
-    });
+    try {
+      const staff = await this.staffModel.create({
+        name: String(payload.name || "").trim(),
+        username,
+        passwordHash: await bcrypt.hash(password, 10),
+        mobile: String(payload.mobile || "").trim(),
+        email: String(payload.email || "").trim(),
+        designation: String(payload.designation || "").trim(),
+        role: "staff",
+        status: payload.status === "inactive" ? "inactive" : "active",
+        deletedAt: null,
+      });
 
-    await this.logAction("admin", "staff.create", { username }, "admin", String(staff._id));
-    return stripHash(staff);
+      await this.logAction("admin", "staff.create", { username }, "admin", String(staff._id));
+      return stripHash(staff);
+    } catch (error) {
+      if (isDuplicateUsernameError(error)) {
+        throw new ConflictException("Username already exists.");
+      }
+      throw error;
+    }
   }
 
   async updateStaff(id: string, payload: UpdateStaffDto) {
@@ -494,9 +512,16 @@ export class StaffService {
     if (payload.designation !== undefined) staff.designation = payload.designation.trim();
     if (payload.status) staff.status = payload.status;
 
-    await staff.save();
-    await this.logAction("admin", "staff.update", { staffId: id }, "admin", id);
-    return stripHash(staff);
+    try {
+      await staff.save();
+      await this.logAction("admin", "staff.update", { staffId: id }, "admin", id);
+      return stripHash(staff);
+    } catch (error) {
+      if (isDuplicateUsernameError(error)) {
+        throw new ConflictException("Username already exists.");
+      }
+      throw error;
+    }
   }
 
   async setStatus(id: string, status: "active" | "inactive") {

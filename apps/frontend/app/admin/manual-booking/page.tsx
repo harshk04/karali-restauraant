@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Card, Input, Modal } from "@karali/ui";
+import { Button, Card, Input } from "@karali/ui";
 import { api } from "../../../lib/api";
 
 type BookingRecord = {

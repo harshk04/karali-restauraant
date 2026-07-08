@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Card, DataTable, Input, Modal } from "@karali/ui";
+import { Button, Card, DataTable, Input, Modal, PasswordInput } from "@karali/ui";
 import { api } from "../../lib/api";
 
 type StaffRecord = {
@@ -67,6 +67,14 @@ export function StaffManagement() {
     }),
     [staff],
   );
+  const canCreateStaff = useMemo(() => {
+    return Boolean(
+      form.name.trim() &&
+        form.username.trim() &&
+        form.password.length >= 8 &&
+        form.password === form.confirmPassword,
+    );
+  }, [form.confirmPassword, form.name, form.password, form.username]);
 
   useEffect(() => {
     if (selectedStaff && editOpen) {
@@ -90,13 +98,30 @@ export function StaffManagement() {
   async function createStaff() {
     setMessage("");
     try {
-      await api.post("/admin/staff", form);
+      await api.post("/admin/staff", {
+        name: form.name.trim(),
+        username: form.username.trim(),
+        password: form.password,
+        confirmPassword: form.confirmPassword,
+        mobile: form.mobile.trim(),
+        email: form.email.trim() || undefined,
+        designation: form.designation.trim(),
+        status: form.status,
+      });
       await refresh();
       setForm(emptyForm);
       setCreateOpen(false);
       setMessage("Staff account created.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to create staff.");
+      const apiMessage =
+        error && typeof error === "object" && "response" in error
+          ? (error as { response?: { data?: { message?: string | string[] } } }).response?.data?.message
+          : undefined;
+      setMessage(
+        Array.isArray(apiMessage)
+          ? apiMessage[0]
+          : apiMessage || (error instanceof Error ? error.message : "Unable to create staff."),
+      );
     }
   }
 
@@ -342,8 +367,8 @@ export function StaffManagement() {
         <div className="grid gap-4 sm:grid-cols-2">
           <Input value={form.name} onChange={(event: { target: { value: string } }) => setForm({ ...form, name: event.target.value })} placeholder="Full Name" />
           <Input value={form.username} onChange={(event: { target: { value: string } }) => setForm({ ...form, username: event.target.value })} placeholder="Username" />
-          <Input value={form.password} onChange={(event: { target: { value: string } }) => setForm({ ...form, password: event.target.value })} type="password" placeholder="Password" />
-          <Input value={form.confirmPassword} onChange={(event: { target: { value: string } }) => setForm({ ...form, confirmPassword: event.target.value })} type="password" placeholder="Confirm Password" />
+          <PasswordInput value={form.password} onChange={(event: { target: { value: string } }) => setForm({ ...form, password: event.target.value })} placeholder="Password" />
+          <PasswordInput value={form.confirmPassword} onChange={(event: { target: { value: string } }) => setForm({ ...form, confirmPassword: event.target.value })} placeholder="Confirm Password" />
           <Input value={form.mobile} onChange={(event: { target: { value: string } }) => setForm({ ...form, mobile: event.target.value })} placeholder="Mobile Number" />
           <Input value={form.email} onChange={(event: { target: { value: string } }) => setForm({ ...form, email: event.target.value })} placeholder="Email Address (optional)" />
           <Input value={form.designation} onChange={(event: { target: { value: string } }) => setForm({ ...form, designation: event.target.value })} placeholder="Designation" />
@@ -358,7 +383,7 @@ export function StaffManagement() {
         </div>
         <div className="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)}>Cancel</Button>
-          <Button type="button" onClick={() => void createStaff()}>Create Staff</Button>
+          <Button type="button" onClick={() => void createStaff()} disabled={!canCreateStaff}>Create Staff</Button>
         </div>
       </Modal>
 
@@ -386,8 +411,8 @@ export function StaffManagement() {
 
       <Modal open={resetOpen} title="Reset Password" className="max-w-xl">
         <div className="space-y-4">
-          <Input value={resetPassword.newPassword} onChange={(event: { target: { value: string } }) => setResetPassword({ ...resetPassword, newPassword: event.target.value })} type="password" placeholder="New Password" />
-          <Input value={resetPassword.confirmPassword} onChange={(event: { target: { value: string } }) => setResetPassword({ ...resetPassword, confirmPassword: event.target.value })} type="password" placeholder="Confirm Password" />
+          <PasswordInput value={resetPassword.newPassword} onChange={(event: { target: { value: string } }) => setResetPassword({ ...resetPassword, newPassword: event.target.value })} placeholder="New Password" />
+          <PasswordInput value={resetPassword.confirmPassword} onChange={(event: { target: { value: string } }) => setResetPassword({ ...resetPassword, confirmPassword: event.target.value })} placeholder="Confirm Password" />
         </div>
         <div className="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button type="button" variant="secondary" onClick={() => setResetOpen(false)}>Cancel</Button>

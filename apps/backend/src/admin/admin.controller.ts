@@ -188,14 +188,14 @@ export class AdminAuthController {
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production" && isHttps,
       path: "/",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: 6 * 60 * 60 * 1000,
     });
     response.cookie("admin_session_hint", "1", {
       httpOnly: false,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production" && isHttps,
       path: "/",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: 6 * 60 * 60 * 1000,
     });
 
     return { success: true, admin: result.session, token: result.token };

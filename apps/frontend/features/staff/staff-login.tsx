@@ -3,7 +3,7 @@
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, Input } from "@karali/ui";
+import { Button, Card, Input, PasswordInput } from "@karali/ui";
 import { staffApi } from "../../lib/staff-api";
 
 export function StaffLogin({ redirectTo = "/staff/dashboard" }: { redirectTo?: string }) {
@@ -44,7 +44,7 @@ export function StaffLogin({ redirectTo = "/staff/dashboard" }: { redirectTo?: s
   }
 
   return (
-    <Card className="space-y-5">
+    <Card className="w-full space-y-5">
       <div>
         <p className="text-xs uppercase tracking-[0.35em] text-[#8f4a00]">
           Staff access
@@ -64,13 +64,12 @@ export function StaffLogin({ redirectTo = "/staff/dashboard" }: { redirectTo?: s
           }
           placeholder="Username"
         />
-        <Input
+        <PasswordInput
           value={password}
           onChange={(event: { target: { value: string } }) =>
             setPassword(event.target.value)
           }
           placeholder="Password"
-          type="password"
         />
         {error ? <p className="text-sm text-[#b54646]">{error}</p> : null}
         <Button className="w-full" type="submit" disabled={loading}>

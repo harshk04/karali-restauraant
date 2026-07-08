@@ -5,7 +5,7 @@ export default function StaffLoginPage() {
   return (
     <main>
       <Navbar />
-      <div className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-8 sm:px-5 lg:grid-cols-12 lg:px-16 lg:py-16">
+      <div className="mx-auto flex w-full max-w-3xl justify-center px-4 py-8 sm:px-5 lg:px-16 lg:py-16">
         <StaffLogin redirectTo="/staff/dashboard" />
       </div>
     </main>

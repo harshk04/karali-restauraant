@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Card, Input } from "@karali/ui";
+import { Button, Card, PasswordInput } from "@karali/ui";
 import { staffApi } from "../../../lib/staff-api";
 
 type StaffProfile = {
@@ -80,9 +80,9 @@ export default function StaffProfilePage() {
       <Card className="space-y-4 xl:col-span-6">
         <h2 className="lux-heading text-2xl font-semibold text-[#231a13]">Change Password</h2>
         <div className="space-y-4">
-          <Input value={currentPassword} onChange={(event: { target: { value: string } }) => setCurrentPassword(event.target.value)} type="password" placeholder="Current password" />
-          <Input value={newPassword} onChange={(event: { target: { value: string } }) => setNewPassword(event.target.value)} type="password" placeholder="New password" />
-          <Input value={confirmPassword} onChange={(event: { target: { value: string } }) => setConfirmPassword(event.target.value)} type="password" placeholder="Confirm new password" />
+          <PasswordInput value={currentPassword} onChange={(event: { target: { value: string } }) => setCurrentPassword(event.target.value)} placeholder="Current password" />
+          <PasswordInput value={newPassword} onChange={(event: { target: { value: string } }) => setNewPassword(event.target.value)} placeholder="New password" />
+          <PasswordInput value={confirmPassword} onChange={(event: { target: { value: string } }) => setConfirmPassword(event.target.value)} placeholder="Confirm new password" />
           {message ? <div className="text-sm text-[#1b6a36]">{message}</div> : null}
           <Button type="button" onClick={() => void changePassword()} className="w-full">
             Update Password

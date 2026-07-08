@@ -3,7 +3,7 @@
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, Input } from "@karali/ui";
+import { Button, Card, Input, PasswordInput } from "@karali/ui";
 import { api } from "../../lib/api";
 
 export function AdminLogin({ redirectTo = "/admin" }: { redirectTo?: string }) {
@@ -60,7 +60,7 @@ export function AdminLogin({ redirectTo = "/admin" }: { redirectTo?: string }) {
       </div>
       <form className="space-y-4" onSubmit={handleSubmit}>
         <Input value={email} onChange={(event: { target: { value: string } }) => setEmail(event.target.value)} placeholder="Admin email" />
-        <Input value={password} onChange={(event: { target: { value: string } }) => setPassword(event.target.value)} placeholder="Password" type="password" />
+        <PasswordInput value={password} onChange={(event: { target: { value: string } }) => setPassword(event.target.value)} placeholder="Password" />
         {error ? <p className="text-sm text-[#b54646]">{error}</p> : null}
         <Button className="w-full" type="submit" disabled={loading}>
           {loading ? "Signing in..." : "Login"}

@@ -67,7 +67,7 @@ export class AdminService {
 
     const token = this.jwtService.sign(session, {
       secret: process.env.JWT_SECRET || "change-me",
-      expiresIn: "7d",
+      expiresIn: "6h",
     });
 
     return { session, token };

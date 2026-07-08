@@ -97,7 +97,6 @@ export default async function ConfirmedPage({
   }
 
   const calendarHref = buildCalendarHref(qr);
-  const shareHref = `/booking/confirmed?bookingId=${encodeURIComponent(bookingId)}`;
 
   return (
     <main className="booking_theme_page booking_confirmation_page">

@@ -161,14 +161,14 @@ export class StaffAuthController {
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production" && isHttps,
       path: "/",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: 24 * 60 * 60 * 1000,
     });
     response.cookie("staff_session_hint", "1", {
       httpOnly: false,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production" && isHttps,
       path: "/",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: 24 * 60 * 60 * 1000,
     });
 
     return { success: true, staff: result.session, token: result.token };

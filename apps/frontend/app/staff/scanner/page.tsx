@@ -180,7 +180,16 @@ export default function StaffScannerPage() {
       setSuccess(false);
       setScannerMode("Starting camera...");
       setCameraStatus("Requesting camera permission...");
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      const mediaDevices = navigator.mediaDevices;
+      if (!mediaDevices?.getUserMedia) {
+        setCameraStatus(
+          "Camera access is not supported in this browser. Please upload a QR image instead.",
+        );
+        setScannerMode("Camera unavailable");
+        return;
+      }
+
+      const stream = await mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;

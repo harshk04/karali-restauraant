@@ -170,11 +170,12 @@ export default function AvailabilityPage() {
             <div className="mt-2 text-sm font-medium text-[#231a13]">
               Pick a date or date range
             </div>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
               <Button
                 type="button"
                 variant={dateMode === "single" ? "primary" : "secondary"}
                 onClick={() => setDateMode("single")}
+                className="w-full sm:w-auto"
               >
                 Single date
               </Button>
@@ -182,6 +183,7 @@ export default function AvailabilityPage() {
                 type="button"
                 variant={dateMode === "range" ? "primary" : "secondary"}
                 onClick={() => setDateMode("range")}
+                className="w-full sm:w-auto"
               >
                 Date range
               </Button>
@@ -222,11 +224,12 @@ export default function AvailabilityPage() {
             <div className="mt-2 text-sm font-medium text-[#231a13]">
               Choose entire day or partial hours
             </div>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
               <Button
                 type="button"
                 variant={durationMode === "entire" ? "primary" : "secondary"}
                 onClick={() => setDurationMode("entire")}
+                className="w-full sm:w-auto"
               >
                 Entire duration
               </Button>
@@ -234,6 +237,7 @@ export default function AvailabilityPage() {
                 type="button"
                 variant={durationMode === "partial" ? "primary" : "secondary"}
                 onClick={() => setDurationMode("partial")}
+                className="w-full sm:w-auto"
               >
                 Partial hours
               </Button>
