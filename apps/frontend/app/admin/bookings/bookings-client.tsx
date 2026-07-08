@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Filter, X } from "lucide-react";
-import { Button, Card, Input } from "@karali/ui";
+import { CheckCircle2, Filter, X, XCircle } from "lucide-react";
+import { Button, Card, Input, Modal } from "@karali/ui";
 import { BookingDetailsModal, type BookingRecord } from "../../../features/admin/booking-details-modal";
 import { api } from "../../../lib/api";
 
@@ -42,6 +42,11 @@ export function AdminBookingsClient({
   const [statusFilter, setStatusFilter] = useState("active");
   const [dateFilter, setDateFilter] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("all");
+  const [actionDialog, setActionDialog] = useState<
+    | { type: "check-in" | "cancel"; booking: BookingRecord }
+    | { type: "success-check-in"; booking: BookingRecord }
+    | null
+  >(null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -87,6 +92,34 @@ export function AdminBookingsClient({
       }
     } finally {
       setPendingAction("");
+    }
+  }
+
+  function openCheckInDialog(booking: BookingRecord) {
+    setSelectedBooking(null);
+    setActionDialog({ type: "check-in", booking });
+  }
+
+  function openCancelDialog(booking: BookingRecord) {
+    setSelectedBooking(null);
+    setActionDialog({ type: "cancel", booking });
+  }
+
+  async function confirmAction() {
+    if (!actionDialog) return;
+    if (actionDialog.type === "success-check-in") {
+      setActionDialog(null);
+      return;
+    }
+
+    const { booking } = actionDialog;
+    const action = actionDialog.type === "check-in" ? "check-in" : "cancel";
+    await updateBooking(booking.bookingId, action);
+
+    if (action === "check-in") {
+      setActionDialog({ type: "success-check-in", booking });
+    } else {
+      setActionDialog(null);
     }
   }
 
@@ -249,7 +282,7 @@ export function AdminBookingsClient({
                 {actionableCheckInStatuses.has(booking.status) ? (
                   <Button
                     type="button"
-                    onClick={() => updateBooking(booking.bookingId, "check-in")}
+                    onClick={() => openCheckInDialog(booking)}
                     disabled={pendingAction === `${booking.bookingId}:check-in`}
                     className="w-full sm:w-auto"
                   >
@@ -275,7 +308,7 @@ export function AdminBookingsClient({
                   <button
                     type="button"
                     className="flex h-11 w-full items-center justify-center rounded-full border border-[#e6cbbb] bg-white text-[#9a3d21] transition-colors hover:bg-[#fff1e9] sm:w-11"
-                    onClick={() => updateBooking(booking.bookingId, "cancel")}
+                    onClick={() => openCancelDialog(booking)}
                     disabled={pendingAction === `${booking.bookingId}:cancel`}
                     aria-label={`Cancel booking ${booking.bookingId}`}
                   >
@@ -349,7 +382,7 @@ export function AdminBookingsClient({
                       {actionableCheckInStatuses.has(booking.status) ? (
                         <Button
                           type="button"
-                          onClick={() => updateBooking(booking.bookingId, "check-in")}
+                          onClick={() => openCheckInDialog(booking)}
                           disabled={pendingAction === `${booking.bookingId}:check-in`}
                         >
                           {pendingAction === `${booking.bookingId}:check-in`
@@ -373,7 +406,7 @@ export function AdminBookingsClient({
                         <button
                           type="button"
                           className="flex h-10 w-10 items-center justify-center rounded-full border border-[#e6cbbb] bg-white text-[#9a3d21] transition-colors hover:bg-[#fff1e9]"
-                          onClick={() => updateBooking(booking.bookingId, "cancel")}
+                          onClick={() => openCancelDialog(booking)}
                           disabled={pendingAction === `${booking.bookingId}:cancel`}
                           aria-label={`Cancel booking ${booking.bookingId}`}
                         >
@@ -405,13 +438,152 @@ export function AdminBookingsClient({
         onClose={() => setSelectedBooking(null)}
         onCheckIn={
           selectedBooking && actionableCheckInStatuses.has(selectedBooking.status)
-            ? (bookingId) => void updateBooking(bookingId, "check-in")
+            ? () => {
+                if (selectedBooking) openCheckInDialog(selectedBooking);
+              }
             : undefined
         }
         pendingCheckIn={Boolean(
           selectedBooking && pendingAction === `${selectedBooking.bookingId}:check-in`,
         )}
       />
+
+      <Modal
+        open={Boolean(actionDialog)}
+        title={
+          actionDialog?.type === "cancel"
+            ? "Confirm cancellation"
+            : actionDialog?.type === "success-check-in"
+              ? "Checked in"
+              : "Confirm check in"
+        }
+        className="max-w-2xl"
+      >
+        {actionDialog ? (
+          <div className="space-y-5">
+            {actionDialog.type === "success-check-in" ? (
+              <div className="rounded-[24px] border border-[#d6ecd8] bg-[#f4fbf5] p-5">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="mt-1 h-6 w-6 text-[#2d7a44]" />
+                  <div className="space-y-1">
+                    <p className="text-lg font-semibold text-[#231a13]">
+                      Guest checked in successfully.
+                    </p>
+                    <p className="text-sm text-[#496652]">
+                      The booking is now marked as checked in.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="rounded-[24px] border border-[#e8d9cd] bg-[#fffaf5] p-5">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-[#554336]/70">
+                    Booking Details
+                  </p>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <div className="text-[11px] uppercase tracking-[0.2em] text-[#554336]/60">
+                        Booking ID
+                      </div>
+                      <div className="mt-1 font-semibold text-[#231a13]">
+                        {actionDialog.booking.bookingId}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] uppercase tracking-[0.2em] text-[#554336]/60">
+                        Guest
+                      </div>
+                      <div className="mt-1 font-semibold text-[#231a13]">
+                        {actionDialog.booking.customerName}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] uppercase tracking-[0.2em] text-[#554336]/60">
+                        Date
+                      </div>
+                      <div className="mt-1 font-semibold text-[#231a13]">
+                        {actionDialog.booking.date}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] uppercase tracking-[0.2em] text-[#554336]/60">
+                        Time
+                      </div>
+                      <div className="mt-1 font-semibold text-[#231a13]">
+                        {actionDialog.booking.time}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] uppercase tracking-[0.2em] text-[#554336]/60">
+                        Guests
+                      </div>
+                      <div className="mt-1 font-semibold text-[#231a13]">
+                        {actionDialog.booking.pax}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] uppercase tracking-[0.2em] text-[#554336]/60">
+                        Status
+                      </div>
+                      <div className="mt-1 font-semibold text-[#231a13]">
+                        {actionDialog.booking.status}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 rounded-[24px] border border-[#e8d9cd] bg-[#fff7f0] p-5">
+                  {actionDialog.type === "cancel" ? (
+                    <XCircle className="mt-1 h-6 w-6 text-[#b54646]" />
+                  ) : (
+                    <CheckCircle2 className="mt-1 h-6 w-6 text-[#2d7a44]" />
+                  )}
+                  <div className="space-y-1">
+                    <p className="text-lg font-semibold text-[#231a13]">
+                      {actionDialog.type === "cancel"
+                        ? "Are you sure you want to cancel this booking?"
+                        : "Mark this booking as checked in?"}
+                    </p>
+                    <p className="text-sm text-[#554336]">
+                      {actionDialog.type === "cancel"
+                        ? "This action will update the booking status to cancelled."
+                        : "This will update the booking status to checked in and show a confirmation popup."}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => setActionDialog(null)}
+                  >
+                    {actionDialog.type === "cancel" ? "Keep Booking" : "Close"}
+                  </Button>
+                  {actionDialog.type !== "success-check-in" ? (
+                    <Button
+                      type="button"
+                      onClick={() => void confirmAction()}
+                      disabled={
+                        pendingAction === `${actionDialog.booking.bookingId}:check-in` ||
+                        pendingAction === `${actionDialog.booking.bookingId}:cancel`
+                      }
+                    >
+                      {pendingAction === `${actionDialog.booking.bookingId}:check-in` ||
+                      pendingAction === `${actionDialog.booking.bookingId}:cancel`
+                        ? "Working..."
+                        : actionDialog.type === "cancel"
+                          ? "Yes, Cancel"
+                          : "Yes, Check In"}
+                    </Button>
+                  ) : null}
+                </div>
+              </>
+            )}
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 }

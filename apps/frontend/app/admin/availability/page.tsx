@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Card, Input } from "@karali/ui";
+import { Button, Card, Input, Modal } from "@karali/ui";
 import { api } from "../../../lib/api";
 
 const closureReasonOptions = [
@@ -42,6 +42,15 @@ export default function AvailabilityPage() {
   const [closureReasonOption, setClosureReasonOption] = useState<
     (typeof closureReasonOptions)[number]
   >("Holiday closure");
+  const [pendingClosure, setPendingClosure] = useState<{
+    startDate: string;
+    endDate: string;
+    startTime: string;
+    endTime: string;
+    reason: string;
+    entireDay: boolean;
+    displayReasonToCustomers: boolean;
+  } | null>(null);
   const [closure, setClosure] = useState({
     startDate: "",
     endDate: "",
@@ -94,7 +103,7 @@ export default function AvailabilityPage() {
     await queryClient.invalidateQueries({ queryKey: ["admin-availability"] });
   }
 
-  async function saveClosure() {
+  function buildPendingClosure() {
     const reason =
       closureReasonOption === "Custom reason"
         ? closure.reason
@@ -104,7 +113,7 @@ export default function AvailabilityPage() {
         ? closure.startDate
         : closure.endDate || closure.startDate;
 
-    await api.post("/admin/availability/closures", {
+    return {
       startDate: closure.startDate,
       endDate,
       entireDay: durationMode === "entire",
@@ -112,7 +121,17 @@ export default function AvailabilityPage() {
       endTime: durationMode === "partial" ? closure.endTime : "",
       reason,
       displayReasonToCustomers: closure.displayReasonToCustomers,
-    });
+    };
+  }
+
+  function requestSaveClosure() {
+    setPendingClosure(buildPendingClosure());
+  }
+
+  async function confirmSaveClosure() {
+    if (!pendingClosure) return;
+
+    await api.post("/admin/availability/closures", pendingClosure);
     await queryClient.invalidateQueries({ queryKey: ["admin-availability"] });
     setClosure({
       startDate: "",
@@ -125,6 +144,7 @@ export default function AvailabilityPage() {
     setDateMode("single");
     setDurationMode("entire");
     setClosureReasonOption("Holiday closure");
+    setPendingClosure(null);
   }
 
   async function undoClosure(closureId?: string) {
@@ -168,6 +188,7 @@ export default function AvailabilityPage() {
             </div>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <Input
+                className="min-w-0"
                 value={closure.startDate}
                 onChange={(event: { target: { value: string } }) => {
                   const nextStartDate = event.target.value;
@@ -182,6 +203,7 @@ export default function AvailabilityPage() {
                 placeholder="Start date"
               />
               <Input
+                className="min-w-0"
                 value={dateMode === "single" ? closure.startDate : closure.endDate}
                 onChange={(event: { target: { value: string } }) =>
                   setClosure({ ...closure, endDate: event.target.value })
@@ -219,6 +241,7 @@ export default function AvailabilityPage() {
             {durationMode === "partial" ? (
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <Input
+                  className="min-w-0"
                   value={closure.startTime}
                   onChange={(event: { target: { value: string } }) =>
                     setClosure({ ...closure, startTime: event.target.value })
@@ -227,6 +250,7 @@ export default function AvailabilityPage() {
                   placeholder="Start time"
                 />
                 <Input
+                  className="min-w-0"
                   value={closure.endTime}
                   onChange={(event: { target: { value: string } }) =>
                     setClosure({ ...closure, endTime: event.target.value })
@@ -269,6 +293,7 @@ export default function AvailabilityPage() {
               {closureReasonOption === "Custom reason" ? (
                 <div className="sm:col-span-2">
                   <Input
+                    className="min-w-0"
                     value={closure.reason}
                     onChange={(event: { target: { value: string } }) =>
                       setClosure({ ...closure, reason: event.target.value })
@@ -311,7 +336,7 @@ export default function AvailabilityPage() {
             </div>
           </div>
         </div>
-        <Button onClick={saveClosure} disabled={!canSaveClosure}>
+        <Button onClick={requestSaveClosure} disabled={!canSaveClosure}>
           Save Unavailable Dates
         </Button>
       </Card>
@@ -329,7 +354,7 @@ export default function AvailabilityPage() {
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <div className="font-semibold text-[#231a13]">
+                    <div className="break-words font-semibold text-[#231a13]">
                       {closureItem.startDate.slice(0, 10)}
                       {closureItem.endDate && closureItem.endDate !== closureItem.startDate
                         ? ` to ${closureItem.endDate.slice(0, 10)}`
@@ -367,6 +392,56 @@ export default function AvailabilityPage() {
           </div>
         )}
       </Card>
+
+      <Modal
+        open={Boolean(pendingClosure)}
+        title="Confirm unavailable dates"
+        className="max-w-2xl"
+      >
+        {pendingClosure ? (
+          <div className="space-y-5">
+            <div className="rounded-[24px] border border-[#e8d9cd] bg-[#fffaf5] p-5">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-[#554336]/70">
+                Booking closure preview
+              </p>
+              <div className="mt-3 space-y-2 text-sm text-[#231a13]">
+                <div>
+                  <span className="font-semibold">Date: </span>
+                  {pendingClosure.startDate}
+                  {pendingClosure.endDate !== pendingClosure.startDate
+                    ? ` to ${pendingClosure.endDate}`
+                    : ""}
+                </div>
+                <div>
+                  <span className="font-semibold">Duration: </span>
+                  {pendingClosure.entireDay
+                    ? "Entire day"
+                    : `${pendingClosure.startTime || "--:--"} to ${pendingClosure.endTime || "--:--"}`}
+                </div>
+                <div>
+                  <span className="font-semibold">Reason: </span>
+                  {pendingClosure.reason || "Unavailable"}
+                </div>
+                <div>
+                  <span className="font-semibold">Visibility: </span>
+                  {pendingClosure.displayReasonToCustomers
+                    ? "Shown to customers"
+                    : "Hidden from customers"}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <Button type="button" variant="secondary" onClick={() => setPendingClosure(null)}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={() => void confirmSaveClosure()}>
+                Yes, Save Unavailable
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
 
       <details>
         <Card className="overflow-hidden p-0">

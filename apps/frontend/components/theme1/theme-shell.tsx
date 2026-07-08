@@ -165,8 +165,13 @@ export function ThemeShell({ children }: { children: ReactNode }) {
           <div className="row">
             <div className="col-lg-3 footer_col">
               <div className="footer_logo">
-                <div className="footer_logo_title">Karali</div>
-                <div className="footer_logo_subtitle">restaurant</div>
+                <Link href="/" className="footer_logo_link" aria-label={restaurantName}>
+                  <img
+                    src="/theme1/images/logo-mark.png"
+                    alt={restaurantName}
+                    className="footer_logo_image"
+                  />
+                </Link>
               </div>
               <div className="copyright">
                 <p style={{ lineHeight: 1.2 }}>

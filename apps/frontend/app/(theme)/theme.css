@@ -82,6 +82,16 @@
   line-height: 1.4;
 }
 
+.theme1-site .footer_logo_link {
+  display: inline-block;
+}
+
+.theme1-site .footer_logo_image {
+  display: block;
+  width: min(220px, 100%);
+  height: auto;
+}
+
 .contact_map iframe {
   width: 100%;
   min-height: 450px;
@@ -335,6 +345,8 @@
   .theme1-site .home_highlights .themenu_title {
     padding-left: 1rem;
     padding-right: 1rem;
+    margin-top: 0.5rem;
+    line-height: 1.15;
   }
 
   .theme1-site .home_reservation_button {
@@ -348,6 +360,13 @@
   .theme1-site .home_highlights .themenu_row {
     margin-top: 2.5rem;
     padding-bottom: 2rem;
+  }
+
+  .theme1-site .home_highlights .themenu_title_bar {
+    height: auto;
+    min-height: 103px;
+    padding-top: 1rem;
+    padding-bottom: 1.25rem;
   }
 
   .theme1-site .home_highlights .themenu_col {
@@ -371,7 +390,38 @@
     overflow: hidden;
   }
 
+  .theme1-site .footer_contact {
+    padding-right: 1rem;
+  }
+
+  .theme1-site .footer_contact_text {
+    padding-right: 0.5rem;
+  }
+
   .theme1-site .menu_content {
     min-height: calc(100dvh - 72px);
+  }
+}
+
+@media (max-width: 400px) {
+  .theme1-site .home_highlights .themenu_title_bar {
+    min-height: 92px;
+    padding-top: 0.75rem;
+    padding-bottom: 1rem;
+  }
+
+  .theme1-site .home_highlights .themenu_title {
+    margin-top: 0.25rem;
+    font-size: 1.7rem;
+  }
+
+  .theme1-site .home_container {
+    top: 30%;
+    padding-top: 5rem;
+    padding-bottom: 4rem;
+  }
+
+  .theme1-site .home_reservation_button {
+    margin-bottom: 72px;
   }
 }

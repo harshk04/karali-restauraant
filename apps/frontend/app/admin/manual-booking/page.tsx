@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Card, Input } from "@karali/ui";
+import { Button, Card, Input, Modal } from "@karali/ui";
 import { api } from "../../../lib/api";
 
 type BookingRecord = {
@@ -72,6 +72,7 @@ export default function ManualBookingPage() {
     <div className="space-y-6">
       <Card className="grid gap-5 p-8 md:grid-cols-2">
         <Input
+          className="min-w-0"
           value={form.customerName}
           onChange={(event: { target: { value: string } }) =>
             setForm({ ...form, customerName: event.target.value })
@@ -79,6 +80,7 @@ export default function ManualBookingPage() {
           placeholder="Guest name"
         />
         <Input
+          className="min-w-0"
           value={form.email}
           onChange={(event: { target: { value: string } }) =>
             setForm({ ...form, email: event.target.value })
@@ -86,6 +88,7 @@ export default function ManualBookingPage() {
           placeholder="Email"
         />
         <Input
+          className="min-w-0"
           value={form.phone}
           onChange={(event: { target: { value: string } }) =>
             setForm({ ...form, phone: event.target.value })
@@ -93,6 +96,7 @@ export default function ManualBookingPage() {
           placeholder="Mobile number"
         />
         <Input
+          className="min-w-0"
           value={form.pax}
           onChange={(event: { target: { value: string } }) =>
             setForm({ ...form, pax: event.target.value })
@@ -102,6 +106,7 @@ export default function ManualBookingPage() {
           min="1"
         />
         <Input
+          className="min-w-0"
           value={form.date}
           onChange={(event: { target: { value: string } }) =>
             setForm({ ...form, date: event.target.value })
@@ -109,6 +114,7 @@ export default function ManualBookingPage() {
           type="date"
         />
         <Input
+          className="min-w-0"
           value={form.time}
           onChange={(event: { target: { value: string } }) =>
             setForm({ ...form, time: event.target.value })
@@ -117,6 +123,7 @@ export default function ManualBookingPage() {
         />
         <div className="md:col-span-2">
           <Input
+            className="min-w-0"
             value={form.specialRequest}
             onChange={(event: { target: { value: string } }) =>
               setForm({ ...form, specialRequest: event.target.value })
@@ -146,13 +153,13 @@ export default function ManualBookingPage() {
             {todayManualBookings.map((booking) => (
               <div
                 key={booking.bookingId}
-                className="flex flex-col gap-2 rounded-[24px] border border-[#e8d9cd] bg-[#fffaf5] p-4 md:flex-row md:items-center md:justify-between"
+                className="flex min-w-0 flex-col gap-2 rounded-[24px] border border-[#e8d9cd] bg-[#fffaf5] p-4 md:flex-row md:items-center md:justify-between"
               >
                 <div>
                   <div className="font-semibold text-[#231a13]">
                     {booking.customerName}
                   </div>
-                  <div className="text-sm text-[#554336]">
+                  <div className="break-words text-sm text-[#554336]">
                     {booking.bookingId} · {booking.time} · {booking.pax} guests
                   </div>
                 </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -177,6 +177,8 @@ export function BookingFlow() {
   const [bookingId, setBookingId] = useState("");
   const [attemptId] = useState(() => createUniqueId());
   const [visibleMonth, setVisibleMonth] = useState(startOfMonth(new Date()));
+  const ignoreNextAutoAdvanceRef = useRef(false);
+  const previousStepRef = useRef(currentStep);
 
   const form = useForm<GuestValues>({
     resolver: zodResolver(guestSchema) as never,
@@ -239,12 +241,26 @@ export function BookingFlow() {
   }, [resetBooking, searchParams, setDate, setPax, setStep, setTime]);
 
   useEffect(() => {
-    if (date && currentStep < 2) setStep(2);
-  }, [currentStep, date, setStep]);
+    if (ignoreNextAutoAdvanceRef.current) {
+      ignoreNextAutoAdvanceRef.current = false;
+      return;
+    }
+
+    if (time && currentStep < 3) {
+      setStep(3);
+      return;
+    }
+
+    if (date && currentStep < 2) {
+      setStep(2);
+    }
+  }, [currentStep, date, setStep, time]);
 
   useEffect(() => {
-    if (time && currentStep < 3) setStep(3);
-  }, [currentStep, setStep, time]);
+    if (previousStepRef.current === currentStep) return;
+    previousStepRef.current = currentStep;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [currentStep]);
 
   useEffect(() => {
     form.reset({ guestName, email, phone, specialRequest });
@@ -441,10 +457,12 @@ export function BookingFlow() {
 
     if (currentStep === 2) {
       setTime("");
+      ignoreNextAutoAdvanceRef.current = true;
       setStep(1);
       return;
     }
 
+    ignoreNextAutoAdvanceRef.current = true;
     setStep(currentStep - 1);
   }
 
@@ -552,7 +570,7 @@ export function BookingFlow() {
                               isClosed && !isSelected ? "bg-[#f8efe9]" : "",
                             ].join(" ")}
                           >
-                              <div className="flex items-start justify-between">
+                              <div className="flex items-start justify-between gap-1 max-sm:flex-col max-sm:items-start">
                                 <span className="text-xs font-semibold sm:text-sm">
                                   {format(cell.date, "d")}
                                 </span>
@@ -560,7 +578,7 @@ export function BookingFlow() {
                                 <span
                                   className={`h-2.5 w-2.5 rounded-full ${
                                     isSelected ? "bg-white" : "bg-[#8f4a00]"
-                                  }`}
+                                  } max-sm:self-end max-sm:mt-1`}
                                 ></span>
                               ) : null}
                             </div>
@@ -777,12 +795,12 @@ export function BookingFlow() {
                         type="tel"
                         inputMode="numeric"
                         autoComplete="tel"
-                        placeholder="+919876543210 or 9876543210"
+                        placeholder="9876543210"
                       />
-                      <p className="mt-2 text-xs text-[#554336]/75">
+                      {/* <p className="mt-2 text-xs text-[#554336]/75">
                         Use <span className="font-medium">+91 followed by 10 digits</span> or just{" "}
                         <span className="font-medium">10 digits</span>.
-                      </p>
+                      </p> */}
                     </div>
                     <div className="md:col-span-2">
                       <label className="mb-2 block text-sm font-medium text-[#231a13]">
@@ -797,7 +815,7 @@ export function BookingFlow() {
                     </div>
                     <div className="md:col-span-2">
                       <Button className="w-full" type="submit">
-                        Continue to Review
+                        Continue
                         <ArrowRight className="h-4 w-4" />
                       </Button>
                     </div>

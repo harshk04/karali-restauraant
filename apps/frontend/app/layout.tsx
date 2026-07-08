@@ -10,6 +10,11 @@ const poppins = Poppins({ subsets: ["latin"], weight: ["400", "500", "600", "700
 export const metadata: Metadata = {
   title: "Karali Restaurant Platform",
   description: "Airport dining booking portal for customers, staff, and admins.",
+  icons: {
+    icon: "/theme1/images/logo-mark.png",
+    shortcut: "/theme1/images/logo-mark.png",
+    apple: "/theme1/images/logo-mark.png",
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
