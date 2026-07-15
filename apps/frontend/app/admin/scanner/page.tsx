@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, Modal } from "@karali/ui";
+import { Button, Card, Modal, QRScannerOverlay } from "@karali/ui";
 import jsQR from "jsqr";
+import { RefreshCw } from "lucide-react";
 import { api } from "../../../lib/api";
 
 type ScannedBooking = {
@@ -40,9 +41,13 @@ export default function ScannerPage() {
   const [isSecureContext, setIsSecureContext] = useState(true);
   const [isCameraLive, setIsCameraLive] = useState(false);
   const [cameraStatus, setCameraStatus] = useState("Opening scanner...");
-  const [, setScannerMode] = useState("Waiting for camera...");
+  const [scannerMode, setScannerMode] = useState("Waiting for camera...");
   const [isUploadingQr, setIsUploadingQr] = useState(false);
+  const [isProcessingScan, setIsProcessingScan] = useState(false);
   const [scannerAlert, setScannerAlert] = useState<ScannerAlert | null>(null);
+  const [cameraFacingMode, setCameraFacingMode] = useState<
+    "environment" | "user"
+  >("environment");
 
   useEffect(() => {
     setIsSecureContext(window.isSecureContext);
@@ -60,7 +65,10 @@ export default function ScannerPage() {
     }
 
     try {
-      const parsed = JSON.parse(trimmed) as { bookingId?: string; qrToken?: string };
+      const parsed = JSON.parse(trimmed) as {
+        bookingId?: string;
+        qrToken?: string;
+      };
       return {
         bookingId: parsed.bookingId?.trim() || "",
         qrToken: parsed.qrToken?.trim() || "",
@@ -72,7 +80,9 @@ export default function ScannerPage() {
 
   function normalizeScannerError(error: unknown, fallback: string) {
     const rawMessage =
-      error instanceof Error && error.message.trim() ? error.message.trim() : fallback;
+      error instanceof Error && error.message.trim()
+        ? error.message.trim()
+        : fallback;
     const message = rawMessage.toLowerCase();
 
     if (
@@ -83,11 +93,17 @@ export default function ScannerPage() {
       return "Camera permission was denied. Allow camera access and try again.";
     }
 
-    if (message.includes("notfounderror") || message.includes("requested device not found")) {
+    if (
+      message.includes("notfounderror") ||
+      message.includes("requested device not found")
+    ) {
       return "No camera was found on this device. You can upload the QR image instead.";
     }
 
-    if (message.includes("notreadableerror") || message.includes("could not start video source")) {
+    if (
+      message.includes("notreadableerror") ||
+      message.includes("could not start video source")
+    ) {
       return "The camera is busy in another app or tab. Close it there and try again.";
     }
 
@@ -114,7 +130,11 @@ export default function ScannerPage() {
     return rawMessage;
   }
 
-  function showScannerAlert(error: unknown, fallback: string, title = "Scanner issue") {
+  function showScannerAlert(
+    error: unknown,
+    fallback: string,
+    title = "Scanner issue",
+  ) {
     const message = normalizeScannerError(error, fallback);
     stopScan();
     setCameraStatus(message);
@@ -127,7 +147,9 @@ export default function ScannerPage() {
     if (!parsed.bookingId || !parsed.qrToken || isSubmittingRef.current) {
       if (!parsed.bookingId || !parsed.qrToken) {
         showScannerAlert(
-          new Error("QR code detected, but the secure booking token was missing."),
+          new Error(
+            "QR code detected, but the secure booking token was missing.",
+          ),
           "QR code detected, but the secure booking token was missing.",
           "Invalid QR code",
         );
@@ -136,6 +158,7 @@ export default function ScannerPage() {
     }
 
     isSubmittingRef.current = true;
+    setIsProcessingScan(true);
     setCameraStatus(`QR detected. Confirming booking ${parsed.bookingId}...`);
 
     try {
@@ -157,6 +180,7 @@ export default function ScannerPage() {
       showScannerAlert(error, "Unable to verify this QR code.", "Scan failed");
     } finally {
       isSubmittingRef.current = false;
+      setIsProcessingScan(false);
     }
   }
 
@@ -185,7 +209,9 @@ export default function ScannerPage() {
       const context = canvas.getContext("2d", { willReadFrequently: true });
       if (!context) {
         showScannerAlert(
-          new Error("QR scanning is unavailable because the canvas could not be initialized."),
+          new Error(
+            "QR scanning is unavailable because the canvas could not be initialized.",
+          ),
           "QR scanning is unavailable because the canvas could not be initialized.",
         );
         return;
@@ -213,7 +239,8 @@ export default function ScannerPage() {
       const image = await new Promise<HTMLImageElement>((resolve, reject) => {
         const img = new Image();
         img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error("Unable to read the uploaded image."));
+        img.onerror = () =>
+          reject(new Error("Unable to read the uploaded image."));
         img.src = imageUrl;
       });
 
@@ -223,7 +250,9 @@ export default function ScannerPage() {
 
       const context = canvas.getContext("2d", { willReadFrequently: true });
       if (!context) {
-        throw new Error("QR scanning is unavailable because the canvas could not be initialized.");
+        throw new Error(
+          "QR scanning is unavailable because the canvas could not be initialized.",
+        );
       }
 
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
@@ -255,7 +284,11 @@ export default function ScannerPage() {
       const decodedValue = await decodeQrFromFile(file);
       await submitScan(decodedValue);
     } catch (error) {
-      showScannerAlert(error, "Unable to process the uploaded QR image.", "Upload failed");
+      showScannerAlert(
+        error,
+        "Unable to process the uploaded QR image.",
+        "Upload failed",
+      );
     } finally {
       event.target.value = "";
       setIsUploadingQr(false);
@@ -263,16 +296,26 @@ export default function ScannerPage() {
   }
 
   async function startScan() {
+    await startScanWithFacingMode(cameraFacingMode);
+  }
+
+  async function startScanWithFacingMode(
+    facingMode: "environment" | "user",
+  ) {
     try {
       setScannerAlert(null);
       stopScan();
       isSubmittingRef.current = false;
+      setIsProcessingScan(false);
       setIsCameraLive(false);
+      setCameraFacingMode(facingMode);
       setScannerMode("Starting camera...");
 
       if (!window.isSecureContext) {
         showScannerAlert(
-          new Error("Camera access is blocked in insecure contexts. Use HTTPS or localhost."),
+          new Error(
+            "Camera access is blocked in insecure contexts. Use HTTPS or localhost.",
+          ),
           "Camera access is blocked in insecure contexts. Use HTTPS or localhost.",
           "Secure connection required",
         );
@@ -293,9 +336,7 @@ export default function ScannerPage() {
       }
 
       setCameraStatus("Requesting camera permission...");
-      const stream = await mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
-      });
+      const stream = await mediaDevices.getUserMedia({ video: { facingMode } });
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -318,7 +359,9 @@ export default function ScannerPage() {
         ).BarcodeDetector;
         if (!Detector) {
           showScannerAlert(
-            new Error("Camera is active, but QR detection is not supported in this browser."),
+            new Error(
+              "Camera is active, but QR detection is not supported in this browser.",
+            ),
             "Camera is active, but QR detection is not supported in this browser.",
             "Scanner unavailable",
           );
@@ -350,8 +393,19 @@ export default function ScannerPage() {
       }
     } catch (error) {
       setScannerMode("Camera unavailable");
-      showScannerAlert(error, "Camera access denied or unavailable.", "Camera unavailable");
+      setIsProcessingScan(false);
+      showScannerAlert(
+        error,
+        "Camera access denied or unavailable.",
+        "Camera unavailable",
+      );
     }
+  }
+
+  async function toggleCameraFacingMode() {
+    const nextFacingMode =
+      cameraFacingMode === "environment" ? "user" : "environment";
+    await startScanWithFacingMode(nextFacingMode);
   }
 
   useEffect(() => {
@@ -372,14 +426,15 @@ export default function ScannerPage() {
     streamRef.current = null;
     if (scanTimerRef.current) window.clearInterval(scanTimerRef.current);
     scanTimerRef.current = null;
-    if (animationFrameRef.current) window.cancelAnimationFrame(animationFrameRef.current);
+    if (animationFrameRef.current)
+      window.cancelAnimationFrame(animationFrameRef.current);
     animationFrameRef.current = null;
     setIsCameraLive(false);
     setScannerMode("Scanner stopped");
   }
 
   return (
-    <div className="space-y-6 sm:space-y-8">
+    <div className="space-y-6">
       <Card className="space-y-4 p-4 sm:p-6 lg:p-8">
         <div className="flex flex-wrap items-center gap-3">
           <div
@@ -392,32 +447,54 @@ export default function ScannerPage() {
           >
             {isCameraLive ? "Camera live" : "Camera not live"}
           </div>
+          <div className="rounded-full bg-[#f6efe9] px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#554336]">
+            {scannerMode}
+          </div>
         </div>
         <div className="rounded-2xl border border-[#e8d9cd] bg-[#fffaf5] p-4 text-sm text-[#554336]">
           {cameraStatus}
         </div>
-        <div className="overflow-hidden rounded-[28px] bg-black">
+        <div className="relative overflow-hidden rounded-[28px] bg-black">
           <video
             ref={videoRef}
-            className="aspect-[4/5] w-full object-cover bg-black sm:aspect-video"
+            className="aspect-video w-full bg-black"
             playsInline
             muted
             autoPlay
           />
+          <button
+            type="button"
+            onClick={() => void toggleCameraFacingMode()}
+            className="absolute right-3 top-3 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/35 bg-black/45 text-white backdrop-blur-md transition hover:bg-black/60 focus:outline-none focus:ring-2 focus:ring-white/40"
+            aria-label="Switch camera"
+            title="Switch camera"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </button>
+          <QRScannerOverlay
+            active={
+              isCameraLive &&
+              !isUploadingQr &&
+              !scannerAlert &&
+              !isProcessingScan
+            }
+          />
         </div>
-        <div className="space-y-3 sm:flex sm:flex-wrap sm:gap-3 sm:space-y-0">
-          <div className="grid grid-cols-2 gap-3 sm:flex sm:contents">
-            <Button
-              onClick={startScan}
-              disabled={!isSecureContext}
-              className="w-full sm:w-auto"
-            >
-              Retry Camera
-            </Button>
-            <Button variant="secondary" onClick={stopScan} className="w-full sm:w-auto">
-              Stop
-            </Button>
-          </div>
+        <div className="grid gap-3 sm:flex">
+          <Button
+            onClick={startScan}
+            disabled={!isSecureContext}
+            className="w-full sm:w-auto"
+          >
+            Retry Camera
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={stopScan}
+            className="w-full sm:w-auto"
+          >
+            Stop
+          </Button>
           <Button
             variant="secondary"
             type="button"
@@ -437,7 +514,10 @@ export default function ScannerPage() {
         />
       </Card>
 
-      <Modal open={Boolean(scannerAlert)} title={scannerAlert?.title || "Scanner issue"}>
+      <Modal
+        open={Boolean(scannerAlert)}
+        title={scannerAlert?.title || "Scanner issue"}
+      >
         {scannerAlert ? (
           <div className="space-y-5">
             <div className="rounded-[24px] border border-[#f0d5c2] bg-[#fff7f0] p-5 text-[#554336]">

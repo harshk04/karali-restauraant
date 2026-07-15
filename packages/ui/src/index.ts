@@ -8,6 +8,7 @@ export * from "./components/date-picker";
 export * from "./components/calendar";
 export * from "./components/booking-stepper";
 export * from "./components/qr-viewer";
+export * from "./components/qr-scanner-overlay";
 export * from "./components/analytics-card";
 export * from "./components/data-table";
 export * from "./components/navbar";
