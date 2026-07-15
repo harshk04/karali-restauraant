@@ -1,9 +1,9 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { ScheduleModule } from "@nestjs/schedule";
 import { appConfig } from "./config";
 import { AuthModule } from "./auth/auth.module";
 import { BookingsModule } from "./bookings/bookings.module";
-import { CheckinsModule } from "./checkins/checkins.module";
 import { DatabaseModule } from "./database/database.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { PaymentsModule } from "./payments/payments.module";
@@ -16,17 +16,18 @@ import { SlotsModule } from "./slots/slots.module";
 import { UploadsModule } from "./uploads/uploads.module";
 import { UsersModule } from "./users/users.module";
 import { StaffModule } from "./staff/staff.module";
+import { HealthController } from "./health.controller";
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [appConfig] }),
+    ScheduleModule.forRoot(),
     DatabaseModule,
     AuthModule,
     UsersModule,
     BookingsModule,
     SlotsModule,
     QrModule,
-    CheckinsModule,
     NotificationsModule,
     PaymentsModule,
     AdminModule,
@@ -36,5 +37,6 @@ import { StaffModule } from "./staff/staff.module";
     UploadsModule,
     StaffModule,
   ],
+  controllers: [HealthController],
 })
 export class AppModule {}

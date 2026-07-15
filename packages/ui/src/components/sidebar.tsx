@@ -1,17 +1,28 @@
 "use client";
 
+import { cn } from "../lib";
+
 export function Sidebar({
   items,
   active,
   footer,
+  className,
+  onNavigate,
 }: {
   items: Array<{ label: string; href: string; icon?: any }>;
   active: string;
   footer?: any;
+  className?: string;
+  onNavigate?: () => void;
 }) {
   return (
-    <aside className="lux-panel lux-panel-strong sticky top-0 hidden h-screen w-72 flex-col rounded-none border-r border-white/30 p-6 lg:flex">
-      <div className="mb-10">
+    <aside
+      className={cn(
+        "lux-panel lux-panel-strong sticky top-0 flex h-screen flex-col overflow-hidden rounded-none border-r border-white/30 p-5",
+        className,
+      )}
+    >
+      <div className="mb-8">
         <div className="lux-heading text-3xl font-bold text-[#8f4a00]">
           Karali
         </div>
@@ -19,13 +30,14 @@ export function Sidebar({
           Admin Portal
         </div>
       </div>
-      <nav className="space-y-2">
+      <nav className="flex-1 space-y-2">
         {items.map((item) => (
           <a
             key={item.label}
             href={item.href}
+            onClick={onNavigate}
             className={[
-              "flex items-center gap-3 rounded-[22px] px-4 py-3 text-sm font-medium transition-all duration-300",
+              "flex min-h-11 items-center gap-3 rounded-[22px] px-4 py-3 text-sm font-medium transition-all duration-300",
               active === item.label
                 ? "bg-[#ffdcc4] text-[#2f1400] shadow-[0_16px_30px_-20px_rgba(143,74,0,0.6)]"
                 : "text-[#554336] hover:bg-white/60 hover:text-[#231a13]",
@@ -38,7 +50,7 @@ export function Sidebar({
           </a>
         ))}
       </nav>
-      {footer ? <div className="mt-auto">{footer}</div> : null}
+      {footer ? <div className="mt-6">{footer}</div> : null}
     </aside>
   );
 }

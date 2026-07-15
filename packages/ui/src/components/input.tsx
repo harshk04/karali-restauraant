@@ -17,7 +17,7 @@ export function Input({ className, type = "text", ...props }: InputProps) {
     <input
       type={type}
       className={cn(
-        "h-12 w-full rounded-2xl border border-transparent bg-[#f4f0ec] px-4 text-sm text-[#231a13] outline-none transition-all duration-300 placeholder:text-[#8e7f74] focus:border-[#c96a00]/30 focus:bg-white focus:shadow-[0_0_0_1.5px_#c96a00,0_0_18px_rgba(201,106,0,0.12)]",
+        "h-12 w-full rounded-2xl border border-transparent bg-[#f4f0ec] px-4 text-[16px] text-[#231a13] outline-none transition-all duration-300 placeholder:text-[#8e7f74] focus:border-[#c96a00]/30 focus:bg-white focus:shadow-[0_0_0_1.5px_#c96a00,0_0_18px_rgba(201,106,0,0.12)] sm:text-sm",
         className,
       )}
       {...props}

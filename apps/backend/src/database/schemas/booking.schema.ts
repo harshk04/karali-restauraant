@@ -47,6 +47,15 @@ export class Booking {
   @Prop({ default: "" })
   qrCode!: string;
 
+  @Prop({ default: "", select: false })
+  accessKeyHash!: string;
+
+  @Prop({ default: "", select: false })
+  qrTokenHash!: string;
+
+  @Prop({ default: null, type: Date })
+  qrExpiresAt!: Date | null;
+
   @Prop({ required: true })
   slotId!: string;
 
@@ -110,3 +119,5 @@ export class Booking {
 }
 
 export const BookingSchema = SchemaFactory.createForClass(Booking);
+BookingSchema.index({ date: 1, time: 1, status: 1 });
+BookingSchema.index({ slotId: 1, status: 1 });

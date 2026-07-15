@@ -29,7 +29,6 @@ export function StaffShell({ children }: { children: ReactNode }) {
 
   async function logout() {
     await staffApi.post("/staff/auth/logout");
-    document.cookie = "staff_session_hint=; path=/; max-age=0; samesite=lax";
     router.replace("/staff/login");
   }
 

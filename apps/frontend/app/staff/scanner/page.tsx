@@ -11,6 +11,7 @@ type ValidatedBooking = {
   reason?: "invalid" | "expired" | "already_used" | "cancelled";
   booking?: {
     bookingId: string;
+    qrToken?: string;
     customerName: string;
     phone: string;
     email: string;
@@ -39,12 +40,15 @@ export default function StaffScannerPage() {
 
   function parseBookingId(value: string) {
     const trimmed = value.trim();
-    if (!trimmed) return "";
+    if (!trimmed) return { bookingId: "", qrToken: "" };
     try {
-      const parsed = JSON.parse(trimmed) as { bookingId?: string };
-      return parsed.bookingId?.trim() || trimmed;
+      const parsed = JSON.parse(trimmed) as { bookingId?: string; qrToken?: string };
+      return {
+        bookingId: parsed.bookingId?.trim() || "",
+        qrToken: parsed.qrToken?.trim() || "",
+      };
     } catch {
-      return trimmed;
+      return { bookingId: trimmed, qrToken: "" };
     }
   }
 
@@ -58,10 +62,11 @@ export default function StaffScannerPage() {
     setIsCameraLive(false);
   }
 
-  async function validateBooking(bookingId: string) {
+  async function validateBooking(bookingId: string, qrToken: string) {
     try {
       const response = await staffApi.post<ValidatedBooking>("/staff/scan-qr", {
         bookingId,
+        qrToken,
       });
       setScanned(response.data);
       if (!response.data.valid) {
@@ -74,9 +79,9 @@ export default function StaffScannerPage() {
     }
   }
 
-  async function checkIn(bookingId: string) {
+  async function checkIn(bookingId: string, qrToken: string) {
     try {
-      const response = await staffApi.post("/staff/check-in", { bookingId });
+      const response = await staffApi.post("/staff/check-in", { bookingId, qrToken });
       setSuccess(true);
       setCameraStatus(`Checked in ${response.data.customerName}.`);
       stopScan();
@@ -92,13 +97,13 @@ export default function StaffScannerPage() {
   }
 
   async function submitScan(value: string) {
-    const bookingId = parseBookingId(value);
-    if (!bookingId) {
-      setCameraStatus("QR code detected, but no valid booking ID was found.");
+    const parsed = parseBookingId(value);
+    if (!parsed.bookingId || !parsed.qrToken) {
+      setCameraStatus("QR code detected, but the secure booking token was missing.");
       return;
     }
     stopScan();
-    await validateBooking(bookingId);
+    await validateBooking(parsed.bookingId, parsed.qrToken);
   }
 
   function runFallbackScan() {
@@ -311,7 +316,10 @@ export default function StaffScannerPage() {
               ))}
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
-              <Button onClick={() => void checkIn(validatedBooking.bookingId)} className="w-full sm:flex-1">
+              <Button
+                onClick={() => void checkIn(validatedBooking.bookingId, validatedBooking.qrToken || "")}
+                className="w-full sm:flex-1"
+              >
                 Check In
               </Button>
               <Button variant="secondary" onClick={() => { setScanned(null); void startScan(); }} className="w-full sm:flex-1">

@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card } from "@karali/ui";
+import { Button, Card, Modal } from "@karali/ui";
 import jsQR from "jsqr";
 import { api } from "../../../lib/api";
 
 type ScannedBooking = {
   bookingId: string;
+  qrToken?: string;
   customerName?: string;
   email?: string;
   phone?: string;
@@ -19,6 +20,12 @@ type ScannedBooking = {
   totalAmount?: number;
   paymentMethod?: string;
   checkedInAt?: string;
+  alreadyCheckedIn?: boolean;
+};
+
+type ScannerAlert = {
+  title: string;
+  message: string;
 };
 
 export default function ScannerPage() {
@@ -33,8 +40,9 @@ export default function ScannerPage() {
   const [isSecureContext, setIsSecureContext] = useState(true);
   const [isCameraLive, setIsCameraLive] = useState(false);
   const [cameraStatus, setCameraStatus] = useState("Opening scanner...");
-  const [scannerMode, setScannerMode] = useState("Waiting for camera...");
+  const [, setScannerMode] = useState("Waiting for camera...");
   const [isUploadingQr, setIsUploadingQr] = useState(false);
+  const [scannerAlert, setScannerAlert] = useState<ScannerAlert | null>(null);
 
   useEffect(() => {
     setIsSecureContext(window.isSecureContext);
@@ -48,36 +56,94 @@ export default function ScannerPage() {
   function parseBookingId(value: string) {
     const trimmed = value.trim();
     if (!trimmed) {
-      return "";
+      return { bookingId: "", qrToken: "" };
     }
 
     try {
-      const parsed = JSON.parse(trimmed) as { bookingId?: string };
-      return parsed.bookingId?.trim() || "";
+      const parsed = JSON.parse(trimmed) as { bookingId?: string; qrToken?: string };
+      return {
+        bookingId: parsed.bookingId?.trim() || "",
+        qrToken: parsed.qrToken?.trim() || "",
+      };
     } catch {
-      return trimmed;
+      return { bookingId: trimmed, qrToken: "" };
     }
   }
 
-  async function submitScan(value: string) {
-    const bookingId = parseBookingId(value);
+  function normalizeScannerError(error: unknown, fallback: string) {
+    const rawMessage =
+      error instanceof Error && error.message.trim() ? error.message.trim() : fallback;
+    const message = rawMessage.toLowerCase();
 
-    if (!bookingId || isSubmittingRef.current) {
-      if (!bookingId) {
-        setCameraStatus("QR code detected, but no valid booking ID was found.");
+    if (
+      message.includes("notallowederror") ||
+      message.includes("permission denied") ||
+      message.includes("permission dismissed")
+    ) {
+      return "Camera permission was denied. Allow camera access and try again.";
+    }
+
+    if (message.includes("notfounderror") || message.includes("requested device not found")) {
+      return "No camera was found on this device. You can upload the QR image instead.";
+    }
+
+    if (message.includes("notreadableerror") || message.includes("could not start video source")) {
+      return "The camera is busy in another app or tab. Close it there and try again.";
+    }
+
+    if (message.includes("overconstrainederror")) {
+      return "This device could not open the preferred camera. Try again or upload the QR image instead.";
+    }
+
+    if (message.includes("invalid or expired qr code")) {
+      return "This QR code is invalid or has expired. Ask the guest to open the latest booking QR.";
+    }
+
+    if (message.includes("booking not found")) {
+      return "This booking could not be found. Please confirm the QR belongs to an active reservation.";
+    }
+
+    if (message.includes("secure booking token was missing")) {
+      return "This QR code is missing its secure booking token. Please use the latest booking QR.";
+    }
+
+    if (message.includes("network error") || message.includes("timeout")) {
+      return "The scanner could not reach the server. Check the connection and try again.";
+    }
+
+    return rawMessage;
+  }
+
+  function showScannerAlert(error: unknown, fallback: string, title = "Scanner issue") {
+    const message = normalizeScannerError(error, fallback);
+    stopScan();
+    setCameraStatus(message);
+    setScannerAlert({ title, message });
+  }
+
+  async function submitScan(value: string) {
+    const parsed = parseBookingId(value);
+
+    if (!parsed.bookingId || !parsed.qrToken || isSubmittingRef.current) {
+      if (!parsed.bookingId || !parsed.qrToken) {
+        showScannerAlert(
+          new Error("QR code detected, but the secure booking token was missing."),
+          "QR code detected, but the secure booking token was missing.",
+          "Invalid QR code",
+        );
       }
       return;
     }
 
     isSubmittingRef.current = true;
-    setCameraStatus(`QR detected. Confirming booking ${bookingId}...`);
+    setCameraStatus(`QR detected. Confirming booking ${parsed.bookingId}...`);
 
     try {
       const response = await api.post<ScannedBooking>("/admin/scan-qr", {
-        bookingId,
-        staffId: "admin",
+        bookingId: parsed.bookingId,
+        qrToken: parsed.qrToken,
       });
-      setCameraStatus(`QR code scanned successfully for ${bookingId}.`);
+      setCameraStatus(`QR code scanned successfully for ${parsed.bookingId}.`);
       stopScan();
       const params = new URLSearchParams();
       Object.entries(response.data || {}).forEach(([key, rawValue]) => {
@@ -88,9 +154,7 @@ export default function ScannerPage() {
       });
       router.push(`/admin/scanner/success?${params.toString()}`);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unable to verify this QR code.";
-      setCameraStatus(message);
+      showScannerAlert(error, "Unable to verify this QR code.", "Scan failed");
     } finally {
       isSubmittingRef.current = false;
     }
@@ -120,7 +184,10 @@ export default function ScannerPage() {
 
       const context = canvas.getContext("2d", { willReadFrequently: true });
       if (!context) {
-        setCameraStatus("QR scanning is unavailable because the canvas could not be initialized.");
+        showScannerAlert(
+          new Error("QR scanning is unavailable because the canvas could not be initialized."),
+          "QR scanning is unavailable because the canvas could not be initialized.",
+        );
         return;
       }
 
@@ -179,6 +246,7 @@ export default function ScannerPage() {
       return;
     }
 
+    setScannerAlert(null);
     setIsUploadingQr(true);
     setCameraStatus(`Reading uploaded QR image: ${file.name}`);
     setScannerMode("Processing uploaded QR");
@@ -187,9 +255,7 @@ export default function ScannerPage() {
       const decodedValue = await decodeQrFromFile(file);
       await submitScan(decodedValue);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unable to process the uploaded QR image.";
-      setCameraStatus(message);
+      showScannerAlert(error, "Unable to process the uploaded QR image.", "Upload failed");
     } finally {
       event.target.value = "";
       setIsUploadingQr(false);
@@ -198,22 +264,29 @@ export default function ScannerPage() {
 
   async function startScan() {
     try {
+      setScannerAlert(null);
       stopScan();
       isSubmittingRef.current = false;
       setIsCameraLive(false);
       setScannerMode("Starting camera...");
 
       if (!window.isSecureContext) {
-        setCameraStatus(
+        showScannerAlert(
+          new Error("Camera access is blocked in insecure contexts. Use HTTPS or localhost."),
           "Camera access is blocked in insecure contexts. Use HTTPS or localhost.",
+          "Secure connection required",
         );
         return;
       }
 
       const mediaDevices = navigator.mediaDevices;
       if (!mediaDevices?.getUserMedia) {
-        setCameraStatus(
+        showScannerAlert(
+          new Error(
+            "Camera access is not supported in this browser. Please upload a QR image instead.",
+          ),
           "Camera access is not supported in this browser. Please upload a QR image instead.",
+          "Camera unavailable",
         );
         setScannerMode("Camera unavailable");
         return;
@@ -244,8 +317,10 @@ export default function ScannerPage() {
           }
         ).BarcodeDetector;
         if (!Detector) {
-          setCameraStatus(
+          showScannerAlert(
+            new Error("Camera is active, but QR detection is not supported in this browser."),
             "Camera is active, but QR detection is not supported in this browser.",
+            "Scanner unavailable",
           );
           return;
         }
@@ -259,11 +334,11 @@ export default function ScannerPage() {
               await submitScan(value);
             }
           } catch (error) {
-            const message =
-              error instanceof Error
-                ? error.message
-                : "QR detection failed while reading the camera feed.";
-            setCameraStatus(message);
+            showScannerAlert(
+              error,
+              "QR detection failed while reading the camera feed.",
+              "Camera scan failed",
+            );
           }
         }, 1200);
       } else {
@@ -274,13 +349,8 @@ export default function ScannerPage() {
         runJsQrFallback();
       }
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Camera access denied or unavailable.";
-      setCameraStatus(message);
-      setIsCameraLive(false);
       setScannerMode("Camera unavailable");
+      showScannerAlert(error, "Camera access denied or unavailable.", "Camera unavailable");
     }
   }
 
@@ -310,17 +380,6 @@ export default function ScannerPage() {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <div className="lux-hero lux-reveal p-4 sm:p-8 md:p-10">
-        <p className="lux-eyebrow">Arrival Scan</p>
-        <h2 className="lux-heading mt-3 text-3xl font-bold text-[#231a13] sm:text-4xl">
-          Scan booking QR
-        </h2>
-        <p className="mt-2 text-[#554336]">
-          Use camera QR scanning to mark arrivals with the same polished motion
-          and layout language as the customer journey.
-        </p>
-      </div>
-
       <Card className="space-y-4 p-4 sm:p-6 lg:p-8">
         <div className="flex flex-wrap items-center gap-3">
           <div
@@ -333,9 +392,6 @@ export default function ScannerPage() {
           >
             {isCameraLive ? "Camera live" : "Camera not live"}
           </div>
-          <div className="rounded-full bg-[#f6efe9] px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#554336]">
-            {scannerMode}
-          </div>
         </div>
         <div className="rounded-2xl border border-[#e8d9cd] bg-[#fffaf5] p-4 text-sm text-[#554336]">
           {cameraStatus}
@@ -343,19 +399,25 @@ export default function ScannerPage() {
         <div className="overflow-hidden rounded-[28px] bg-black">
           <video
             ref={videoRef}
-            className="aspect-video w-full bg-black"
+            className="aspect-[4/5] w-full object-cover bg-black sm:aspect-video"
             playsInline
             muted
             autoPlay
           />
         </div>
-        <div className="grid gap-3 sm:flex">
-          <Button onClick={startScan} disabled={!isSecureContext} className="w-full sm:w-auto">
-            Retry Camera
-          </Button>
-          <Button variant="secondary" onClick={stopScan} className="w-full sm:w-auto">
-            Stop
-          </Button>
+        <div className="space-y-3 sm:flex sm:flex-wrap sm:gap-3 sm:space-y-0">
+          <div className="grid grid-cols-2 gap-3 sm:flex sm:contents">
+            <Button
+              onClick={startScan}
+              disabled={!isSecureContext}
+              className="w-full sm:w-auto"
+            >
+              Retry Camera
+            </Button>
+            <Button variant="secondary" onClick={stopScan} className="w-full sm:w-auto">
+              Stop
+            </Button>
+          </div>
           <Button
             variant="secondary"
             type="button"
@@ -374,6 +436,35 @@ export default function ScannerPage() {
           onChange={handleQrUpload}
         />
       </Card>
+
+      <Modal open={Boolean(scannerAlert)} title={scannerAlert?.title || "Scanner issue"}>
+        {scannerAlert ? (
+          <div className="space-y-5">
+            <div className="rounded-[24px] border border-[#f0d5c2] bg-[#fff7f0] p-5 text-[#554336]">
+              <p className="text-sm leading-6">{scannerAlert.message}</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Button
+                onClick={() => {
+                  setScannerAlert(null);
+                  void startScan();
+                }}
+                disabled={!isSecureContext}
+                className="w-full"
+              >
+                Retry Camera
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setScannerAlert(null)}
+                className="w-full"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 }

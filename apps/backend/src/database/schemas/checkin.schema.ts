@@ -22,3 +22,4 @@ export class Checkin {
 }
 
 export const CheckinSchema = SchemaFactory.createForClass(Checkin);
+CheckinSchema.index({ checkedInAt: -1 });

@@ -6,14 +6,15 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
-import { JwtService } from "@nestjs/jwt";
 import { Model } from "mongoose";
 import bcrypt from "bcryptjs";
 import { Booking, BookingDocument } from "../database/schemas/booking.schema";
 import { Checkin, CheckinDocument } from "../database/schemas/checkin.schema";
 import { AuditLog, AuditLogDocument } from "../database/schemas/audit-log.schema";
 import { Staff, StaffDocument } from "../database/schemas/staff.schema";
-import type { StaffSession } from "./staff.guard";
+import { SessionTokenService } from "../common/auth/session-token.service";
+import type { StaffSession } from "../common/auth/session.types";
+import { sha256 } from "../common/security/hash.util";
 
 type CreateStaffDto = {
   name: string;
@@ -47,7 +48,8 @@ type ChangePasswordDto = {
 };
 
 type StaffLoginResult = {
-  token: string;
+  accessToken: string;
+  refreshToken: string;
   session: StaffSession;
 };
 
@@ -91,7 +93,7 @@ function isDuplicateUsernameError(error: unknown) {
 @Injectable()
 export class StaffService {
   constructor(
-    private readonly jwtService: JwtService,
+    private readonly sessionTokenService: SessionTokenService,
     @InjectModel(Staff.name) private readonly staffModel: Model<StaffDocument>,
     @InjectModel(Booking.name) private readonly bookingModel: Model<BookingDocument>,
     @InjectModel(Checkin.name) private readonly checkinModel: Model<CheckinDocument>,
@@ -110,12 +112,11 @@ export class StaffService {
       status: staff.status,
     };
 
-    const token = this.jwtService.sign(session, {
-      secret: process.env.JWT_SECRET || "change-me",
-      expiresIn: "1d",
-    });
-
-    return { token, session };
+    return {
+      accessToken: this.sessionTokenService.signAccessToken({ role: "staff", session }),
+      refreshToken: this.sessionTokenService.signRefreshToken("staff", session.id),
+      session,
+    };
   }
 
   async logAction(
@@ -140,7 +141,7 @@ export class StaffService {
     const staff = await this.staffModel.findOne({
       username: normalizedUsername,
       deletedAt: null,
-    });
+    }).select("+passwordHash");
 
     if (!staff || staff.status !== "active") {
       return null;
@@ -155,6 +156,16 @@ export class StaffService {
     await staff.save();
     await this.logAction(String(staff._id), "staff.login", { username: staff.username }, "staff", String(staff._id));
     return this.signSession(staff);
+  }
+
+  async refresh(token: string) {
+    const payload = this.sessionTokenService.verifyRefreshToken(token, "staff");
+    const staff = await this.staffModel.findById(payload.sub).lean();
+    if (!staff || staff.deletedAt || staff.status !== "active") {
+      throw new UnauthorizedException("Staff account is unavailable.");
+    }
+
+    return this.signSession(staff as StaffDocument);
   }
 
   async me(session: StaffSession | undefined) {
@@ -326,20 +337,26 @@ export class StaffService {
     return { success: true };
   }
 
-  async validateBooking(bookingId: string) {
-    const booking = await this.bookingModel.findOne({ bookingId }).lean();
+  async validateBooking(bookingId: string, qrToken: string) {
+    const booking = await this.bookingModel.findOne({ bookingId }).select("+qrTokenHash +qrExpiresAt").lean();
     if (!booking) {
       return { valid: false, reason: "invalid" as const };
     }
 
-    const today = new Date().toISOString().slice(0, 10);
+    if (!qrToken || booking.qrTokenHash !== sha256(qrToken)) {
+      return { valid: false, reason: "invalid" as const };
+    }
+
     if (booking.status === "cancelled") {
       return { valid: false, reason: "cancelled" as const, booking };
     }
     if (booking.status === "checked_in" || booking.checkedInAt) {
       return { valid: false, reason: "already_used" as const, booking };
     }
-    if (booking.date < today) {
+    if (booking.status === "completed" || booking.status === "no_show") {
+      return { valid: false, reason: "invalid" as const, booking };
+    }
+    if (booking.qrExpiresAt && booking.qrExpiresAt.getTime() < Date.now()) {
       return { valid: false, reason: "expired" as const, booking };
     }
 
@@ -347,6 +364,7 @@ export class StaffService {
       valid: true as const,
       booking: {
         bookingId: booking.bookingId,
+        qrToken,
         customerName: booking.customerName,
         phone: booking.phone,
         email: booking.email,
@@ -360,8 +378,8 @@ export class StaffService {
     };
   }
 
-  async checkInBooking(bookingId: string, staff: StaffSession) {
-    const validation = await this.validateBooking(bookingId);
+  async checkInBooking(bookingId: string, qrToken: string, staff: StaffSession) {
+    const validation = await this.validateBooking(bookingId, qrToken);
     if (!validation.valid || !validation.booking) {
       throw new BadRequestException(validation.reason);
     }

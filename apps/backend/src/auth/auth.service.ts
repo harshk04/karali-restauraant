@@ -1,18 +1,12 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotImplementedException } from "@nestjs/common";
 
 @Injectable()
 export class AuthService {
-  login(email: string, _password: string) {
-    return {
-      accessToken: `access.${Buffer.from(email).toString("base64")}`,
-      refreshToken: `refresh.${Buffer.from(email).toString("base64")}`,
-    };
+  login() {
+    throw new NotImplementedException("Customer authentication is not enabled on this platform.");
   }
 
   refresh() {
-    return {
-      accessToken: "access.refreshed",
-      refreshToken: "refresh.refreshed",
-    };
+    throw new NotImplementedException("Customer authentication is not enabled on this platform.");
   }
 }

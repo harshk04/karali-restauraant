@@ -15,8 +15,18 @@ import {
 import { IsEmail, IsOptional, IsString, MinLength, ValidateIf } from "class-validator";
 import type { Request, Response } from "express";
 import { AdminAuthGuard } from "../admin/admin.guard";
-import { StaffAuthGuard, type StaffSession } from "./staff.guard";
+import { StaffAuthGuard } from "./staff.guard";
 import { StaffService } from "./staff.service";
+import type { StaffSession } from "../common/auth/session.types";
+import { AuthRateLimitGuard } from "../common/guards/auth-rate-limit.guard";
+import {
+  STAFF_ACCESS_COOKIE,
+  STAFF_REFRESH_COOKIE,
+} from "../common/auth/session.constants";
+import {
+  buildCookieClearOptions,
+  buildSessionCookieOptions,
+} from "../common/auth/cookie.util";
 
 class StaffLoginDto {
   @IsString()
@@ -108,6 +118,9 @@ class ChangePasswordDto {
 class StaffCheckInDto {
   @IsString()
   bookingId!: string;
+
+  @IsString()
+  qrToken!: string;
 }
 
 class CheckinQueryDto {
@@ -135,12 +148,16 @@ class CheckinQueryDto {
 class StaffScanDto {
   @IsString()
   bookingId!: string;
+
+  @IsString()
+  qrToken!: string;
 }
 
 @Controller("staff/auth")
 export class StaffAuthController {
   constructor(private readonly staffService: StaffService) {}
 
+  @UseGuards(AuthRateLimitGuard)
   @Post("login")
   async login(
     @Body() dto: StaffLoginDto,
@@ -152,38 +169,36 @@ export class StaffAuthController {
       throw new UnauthorizedException("Invalid staff credentials");
     }
 
-    const forwardedProto = request.headers["x-forwarded-proto"];
-    const protoValue = Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto;
-    const isHttps = request.secure || protoValue?.split(",")[0]?.trim() === "https";
+    response.cookie(STAFF_ACCESS_COOKIE, result.accessToken, buildSessionCookieOptions(request, 15 * 60 * 1000));
+    response.cookie(STAFF_REFRESH_COOKIE, result.refreshToken, buildSessionCookieOptions(request, 7 * 24 * 60 * 60 * 1000));
 
-    response.cookie("staff_session", result.token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production" && isHttps,
-      path: "/",
-      maxAge: 24 * 60 * 60 * 1000,
-    });
-    response.cookie("staff_session_hint", "1", {
-      httpOnly: false,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production" && isHttps,
-      path: "/",
-      maxAge: 24 * 60 * 60 * 1000,
-    });
-
-    return { success: true, staff: result.session, token: result.token };
+    return { staff: result.session };
   }
 
   @UseGuards(StaffAuthGuard)
   @Get("me")
   me(@Req() request: Request & { staff?: StaffSession }) {
-    return { success: true, staff: request.staff };
+    return request.staff;
+  }
+
+  @UseGuards(AuthRateLimitGuard)
+  @Post("refresh")
+  async refresh(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const refreshToken = request.cookies?.[STAFF_REFRESH_COOKIE] as string | undefined;
+    if (!refreshToken) {
+      throw new UnauthorizedException("Refresh session required");
+    }
+
+    const result = await this.staffService.refresh(refreshToken);
+    response.cookie(STAFF_ACCESS_COOKIE, result.accessToken, buildSessionCookieOptions(request, 15 * 60 * 1000));
+    response.cookie(STAFF_REFRESH_COOKIE, result.refreshToken, buildSessionCookieOptions(request, 7 * 24 * 60 * 60 * 1000));
+    return { staff: result.session };
   }
 
   @Post("logout")
   logout(@Res({ passthrough: true }) response: Response) {
-    response.clearCookie("staff_session", { path: "/" });
-    response.clearCookie("staff_session_hint", { path: "/" });
+    response.clearCookie(STAFF_ACCESS_COOKIE, buildCookieClearOptions());
+    response.clearCookie(STAFF_REFRESH_COOKIE, buildCookieClearOptions());
     return { success: true };
   }
 }
@@ -224,7 +239,7 @@ export class StaffPortalController {
 
   @Post("scan-qr")
   validateQr(@Body() dto: StaffScanDto) {
-    return this.staffService.validateBooking(dto.bookingId);
+    return this.staffService.validateBooking(dto.bookingId, dto.qrToken);
   }
 
   @Post("check-in")
@@ -232,7 +247,7 @@ export class StaffPortalController {
     @Req() request: Request & { staff?: StaffSession },
     @Body() dto: StaffCheckInDto,
   ) {
-    return this.staffService.checkInBooking(dto.bookingId, request.staff as StaffSession);
+    return this.staffService.checkInBooking(dto.bookingId, dto.qrToken, request.staff as StaffSession);
   }
 }
 

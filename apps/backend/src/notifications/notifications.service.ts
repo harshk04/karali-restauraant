@@ -15,6 +15,8 @@ type BookingNotificationPayload = {
   bookingId?: string;
   customerName?: string;
   phone?: string;
+  accessKey?: string;
+  shareToken?: string;
   date?: string;
   time?: string;
   pax?: number;
@@ -34,9 +36,17 @@ type BookingNotificationResult = {
   error?: string;
 };
 
+const DEFAULT_LOCATION_NAME =
+  "Karali Restaurant, Jaipur International Airport, Land Side, T2, Jaipur, Rajasthan 302017";
+const DEFAULT_LOCATION_URL = "https://maps.app.goo.gl/jsYzwQRznyhnr1fa9";
+
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
+  private templateStatusCache = new Map<
+    string,
+    { status: string; expiresAt: number }
+  >();
 
   constructor(
     private readonly configService: ConfigService,
@@ -86,18 +96,146 @@ export class NotificationsService {
     return this.configService.get<string>("whatsappTemplateName") || "";
   }
 
-  private shouldUseBookingTemplate() {
+  private bookingTemplateRequested() {
+    return this.configService.get<boolean>("whatsappUseBookingTemplate") === true;
+  }
+
+  private async configuredTemplateStatus() {
     const templateName = this.configuredTemplateName();
-    return Boolean(
-      this.configService.get<boolean>("whatsappUseBookingTemplate") ||
-        (templateName && templateName !== "hello_world"),
-    );
+    const accessToken = this.configService.get<string>("whatsappAccessToken");
+    const wabaId = this.configService.get<string>("whatsappBusinessAccountId");
+
+    if (!templateName || !accessToken || !wabaId) {
+      return "UNKNOWN";
+    }
+
+    const cacheKey = `${wabaId}:${templateName}`;
+    const cached = this.templateStatusCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.status;
+    }
+
+    try {
+      const response = await fetch(
+        `${this.apiBaseUrl()}/${wabaId}/message_templates?limit=100`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      );
+
+      if (!response.ok) {
+        const details = await response.text();
+        throw new Error(
+          `WhatsApp template lookup failed with status ${response.status}${details ? `: ${details}` : ""}`,
+        );
+      }
+
+      const data = (await response.json()) as {
+        data?: Array<{ name?: string; status?: string }>;
+      };
+      const status =
+        data.data?.find((item) => item.name === templateName)?.status || "UNKNOWN";
+
+      this.templateStatusCache.set(cacheKey, {
+        status,
+        expiresAt: Date.now() + 5 * 60 * 1000,
+      });
+
+      return status;
+    } catch (error) {
+      this.logger.warn(
+        `Unable to verify WhatsApp template status for ${templateName}: ${this.errorMessage(error)}`,
+      );
+      return "UNKNOWN";
+    }
+  }
+
+  private async shouldUseBookingTemplate() {
+    if (!this.bookingTemplateRequested()) {
+      return false;
+    }
+
+    return (await this.configuredTemplateStatus()) === "APPROVED";
   }
 
   private apiBaseUrl() {
     const version =
       this.configService.get<string>("whatsappApiVersion") || "v20.0";
     return `https://graph.facebook.com/${version}`;
+  }
+
+  private buildPublicUrls(payload: BookingNotificationPayload) {
+    const frontendUrl = this.configService.get<string>("frontendUrl") || "";
+    const backendUrl = this.configService.get<string>("backendUrl") || "";
+    const accessKeyParam = payload.accessKey
+      ? `accessKey=${encodeURIComponent(payload.accessKey)}`
+      : "";
+
+    const confirmationUrl =
+      frontendUrl && payload.bookingId && payload.shareToken
+        ? `${frontendUrl.replace(/\/$/, "")}/c/${encodeURIComponent(payload.bookingId)}/${encodeURIComponent(payload.shareToken)}`
+        : frontendUrl && payload.bookingId && accessKeyParam
+          ? `${frontendUrl.replace(/\/$/, "")}/booking/confirmed?bookingId=${encodeURIComponent(payload.bookingId)}&${accessKeyParam}`
+          : "";
+    const qrImageUrl =
+      backendUrl && payload.bookingId && payload.shareToken
+        ? `${backendUrl.replace(/\/$/, "")}/api/qr/${encodeURIComponent(payload.bookingId)}/image?shareToken=${encodeURIComponent(payload.shareToken)}`
+        : backendUrl && payload.bookingId && accessKeyParam
+          ? `${backendUrl.replace(/\/$/, "")}/api/qr/${encodeURIComponent(payload.bookingId)}/image?${accessKeyParam}`
+        : "";
+
+    return {
+      confirmationUrl,
+      qrImageUrl,
+      locationName: DEFAULT_LOCATION_NAME,
+      locationUrl: DEFAULT_LOCATION_URL,
+    };
+  }
+
+  private buildTemplateBodyParameters(payload: BookingNotificationPayload) {
+    const urls = this.buildPublicUrls(payload);
+    const templateName = this.configuredTemplateName();
+
+    if (templateName === "karali_booking_confirmation_v1") {
+      return [
+        payload.customerName || "Guest",
+        payload.bookingId || "-",
+        payload.date || "-",
+        payload.time || "-",
+        String(payload.pax || 0),
+        "0",
+      ];
+    }
+
+    if (templateName === "karali_booking_confirmation_v4") {
+      return [
+        payload.customerName || "Guest",
+        payload.bookingId || "-",
+        payload.date || "-",
+        payload.time || "-",
+        String(payload.pax || 0),
+      ];
+    }
+
+    return [
+      payload.customerName || "Guest",
+      payload.bookingId || "-",
+      payload.date || "-",
+      payload.time || "-",
+      String(payload.pax || 0),
+      urls.confirmationUrl || urls.locationUrl,
+    ];
+  }
+
+  private errorMessage(error: unknown) {
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    return "Unknown WhatsApp delivery failure.";
   }
 
   private async markMessageStatus(
@@ -387,7 +525,10 @@ export class NotificationsService {
     return data.messages?.[0]?.id || "";
   }
 
-  private async sendTemplateMessage(to: string) {
+  private async sendTemplateMessage(
+    to: string,
+    payload?: BookingNotificationPayload,
+  ) {
     const accessToken = this.configService.get<string>("whatsappAccessToken");
     const phoneNumberId = this.configService.get<string>(
       "whatsappPhoneNumberId",
@@ -418,6 +559,20 @@ export class NotificationsService {
             language: {
               code: templateLanguage,
             },
+            components:
+              payload && (await this.shouldUseBookingTemplate())
+                ? [
+                    {
+                      type: "body",
+                      parameters: this.buildTemplateBodyParameters(payload).map(
+                        (text) => ({
+                          type: "text",
+                          text,
+                        }),
+                      ),
+                    },
+                  ]
+                : undefined,
           },
         }),
       },
@@ -441,6 +596,7 @@ export class NotificationsService {
   }
 
   private buildBookingCaption(payload: BookingNotificationPayload) {
+    const urls = this.buildPublicUrls(payload);
     const lines = [
       `Hello ${payload.customerName || "Guest"}, your Karali reservation is confirmed.`,
       "",
@@ -448,13 +604,12 @@ export class NotificationsService {
       `Date: ${payload.date || "-"}`,
       `Time: ${payload.time || "-"}`,
       `Guests: ${payload.pax || 0}`,
+      `Location: ${urls.locationName}`,
+      `Open maps: ${urls.locationUrl}`,
     ];
 
-    if (payload.paymentStatus === "paid" && (payload.totalAmount || 0) > 0) {
-      lines.push(
-        `Prepaid Amount: INR ${this.currency(payload.totalAmount)}`,
-        "This prepaid amount will be adjusted in the final bill.",
-      );
+    if (urls.confirmationUrl) {
+      lines.push(`Confirmation: ${urls.confirmationUrl}`);
     }
 
     lines.push("Please present this QR pass at check-in.");
@@ -496,24 +651,26 @@ export class NotificationsService {
       };
     }
 
-    const frontendUrl = this.configService.get<string>("frontendUrl") || "";
-    const backendUrl = this.configService.get<string>("backendUrl") || "";
-    const confirmationUrl = frontendUrl
-      ? `${frontendUrl.replace(/\/$/, "")}/booking/confirmed?bookingId=${encodeURIComponent(payload.bookingId)}`
-      : "";
-    const qrFallbackUrl = backendUrl
-      ? `${backendUrl.replace(/\/$/, "")}/qr/${encodeURIComponent(payload.bookingId)}/image`
-      : "";
-    const caption = [
-      this.buildBookingCaption(payload),
-      confirmationUrl ? `Confirmation: ${confirmationUrl}` : "",
-      !payload.qrCode && qrFallbackUrl ? `QR fallback: ${qrFallbackUrl}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n\n");
+    const caption = this.buildBookingCaption(payload);
+
+    const messageIds: string[] = [];
+    const warnings: string[] = [];
+
+    if (await this.shouldUseBookingTemplate()) {
+      try {
+        const templateMessageId = await this.sendTemplateMessage(
+          normalizedPhone,
+          payload,
+        );
+        if (templateMessageId) {
+          messageIds.push(templateMessageId);
+        }
+      } catch (error) {
+        warnings.push(`Template opener failed: ${this.errorMessage(error)}`);
+      }
+    }
 
     try {
-      const messageIds: string[] = [];
       const mediaId = await this.uploadQrMedia(payload.qrCode);
 
       if (mediaId) {
@@ -531,8 +688,12 @@ export class NotificationsService {
           messageIds.push(textMessageId);
         }
       }
+    } catch (error) {
+      warnings.push(`QR follow-up failed: ${this.errorMessage(error)}`);
+    }
 
-      if (payload.paymentStatus === "paid" && (payload.totalAmount || 0) > 0) {
+    if (payload.paymentStatus === "paid" && (payload.totalAmount || 0) > 0) {
+      try {
         const receiptPdf = buildReceiptPdf({
           bookingId: payload.bookingId,
           customerName: payload.customerName || "Guest",
@@ -560,27 +721,29 @@ export class NotificationsService {
         if (receiptMessageId) {
           messageIds.push(receiptMessageId);
         }
+      } catch (error) {
+        warnings.push(`Receipt follow-up failed: ${this.errorMessage(error)}`);
       }
+    }
 
+    if (messageIds.length > 0) {
       return {
         status: "sent_to_meta",
         channel: "whatsapp",
         messageIds,
-      };
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Unknown WhatsApp delivery failure.";
-      this.logger.error(
-        `Failed to send WhatsApp booking confirmation for ${payload.bookingId}: ${message}`,
-      );
-      return {
-        status: "failed",
-        channel: "whatsapp",
-        messageIds: [],
-        error: message,
+        error: warnings.join(" | ") || undefined,
       };
     }
+
+    const message = warnings.join(" | ") || "Unknown WhatsApp delivery failure.";
+    this.logger.error(
+      `Failed to send WhatsApp booking confirmation for ${payload.bookingId}: ${message}`,
+    );
+    return {
+      status: "failed",
+      channel: "whatsapp",
+      messageIds: [],
+      error: message,
+    };
   }
 }

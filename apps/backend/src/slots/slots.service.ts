@@ -26,8 +26,7 @@ export class SlotsService {
     return date >= startDate && date <= endDate;
   }
 
-  private async getDateState(date: string) {
-    const closures = await this.closureModel.find({ active: true }).lean();
+  private getDateState(date: string, closures: ClosureDocument[] = []) {
     const closure = closures.find((item) => item.entireDay !== false && this.isDateInRange(date, item.startDate, item.endDate));
     if (closure) {
       return {
@@ -49,27 +48,50 @@ export class SlotsService {
 
   async calendar() {
     const today = new Date();
-    return Promise.all(
-      Array.from({ length: 30 }).map(async (_, index) => {
-        const date = new Date(today);
-        date.setDate(today.getDate() + index);
-        const value = date.toISOString().slice(0, 10);
-        const state = await this.getDateState(value);
-        const bookingCount = await this.bookingModel.countDocuments({ date: value, status: { $ne: "cancelled" } });
-        return {
-          date: value,
-          label: date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-          status: state.status,
-          reason: state.reason || (bookingCount >= 20 ? "Fully booked" : ""),
-        };
-      }),
-    );
+    const dates = Array.from({ length: 30 }).map((_, index) => {
+      const date = new Date(today);
+      date.setDate(today.getDate() + index);
+      return date;
+    });
+    const dateValues = dates.map((date) => date.toISOString().slice(0, 10));
+    const [closures, bookingCounts] = await Promise.all([
+      this.closureModel.find({ active: true }).lean(),
+      this.bookingModel.aggregate<{ _id: string; count: number }>([
+        {
+          $match: {
+            date: { $in: dateValues },
+            status: { $ne: "cancelled" },
+          },
+        },
+        {
+          $group: {
+            _id: "$date",
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+    ]);
+
+    const bookingCountMap = new Map(bookingCounts.map((item) => [item._id, item.count]));
+
+    return dates.map((date) => {
+      const value = date.toISOString().slice(0, 10);
+      const state = this.getDateState(value, closures as ClosureDocument[]);
+      const bookingCount = bookingCountMap.get(value) || 0;
+
+      return {
+        date: value,
+        label: date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        status: state.status,
+        reason: state.reason || (bookingCount >= 20 ? "Fully booked" : ""),
+      };
+    });
   }
 
   async slots(date: string) {
     const timing = await this.getTiming();
-    const closureState = await this.getDateState(date);
     const closures = await this.closureModel.find({ active: true }).lean();
+    const closureState = this.getDateState(date, closures as ClosureDocument[]);
     const availability = await this.availabilityModel.findOne({ scope: "date", date, active: true }).lean();
     const blockedSlots = new Set([
       ...(availability?.blockedSlots || []),

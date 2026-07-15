@@ -258,9 +258,11 @@ export class PaymentsService implements OnModuleInit {
       const booking = await this.bookingsService.findByBookingId(
         existingPayment.bookingId,
       );
+      const accessKey = await this.bookingsService.rotateAccessKey(existingPayment.bookingId);
       return {
         status: existingPayment.paymentStatus,
         bookingId: existingPayment.bookingId,
+        accessKey,
         userId: existingPayment.userId,
         paymentId: String(existingPayment._id),
         orderId: existingPayment.razorpayOrderId,
@@ -282,7 +284,7 @@ export class PaymentsService implements OnModuleInit {
       phone: normalized.phone,
     });
     const bookingId = this.bookingIdFromKey(idempotencyKey);
-    await this.bookingsService.createPending({
+    const pendingBooking = await this.bookingsService.createPending({
       bookingId,
       customerName: normalized.customerName,
       email: normalized.email,
@@ -350,6 +352,7 @@ export class PaymentsService implements OnModuleInit {
     return {
       paymentId: String(payment._id),
       bookingId,
+      accessKey: pendingBooking.accessKey,
       userId: String(user._id),
       orderId: order.id,
       amount: payment.amount,

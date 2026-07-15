@@ -1,9 +1,7 @@
 import { Module } from "@nestjs/common";
-import { JwtModule } from "@nestjs/jwt";
 import { MongooseModule } from "@nestjs/mongoose";
-import { ConfigModule, ConfigService } from "@nestjs/config";
+import { ConfigModule } from "@nestjs/config";
 import { AdminAuthController, AdminController, CouponsController } from "./admin.controller";
-import { AdminAuthGuard } from "./admin.guard";
 import { AdminService } from "./admin.service";
 import { Booking, BookingSchema } from "../database/schemas/booking.schema";
 import { Payment, PaymentSchema } from "../database/schemas/payment.schema";
@@ -13,17 +11,14 @@ import { Closure, ClosureSchema } from "../database/schemas/closure.schema";
 import { Coupon, CouponSchema } from "../database/schemas/coupon.schema";
 import { Checkin, CheckinSchema } from "../database/schemas/checkin.schema";
 import { BookingsModule } from "../bookings/bookings.module";
+import { AuditLog, AuditLogSchema } from "../database/schemas/audit-log.schema";
+import { SessionAuthModule } from "../common/auth/session-auth.module";
 
 @Module({
   imports: [
     ConfigModule,
     BookingsModule,
-    JwtModule.registerAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        secret: config.get<string>("jwtSecret") || "change-me",
-      }),
-    }),
+    SessionAuthModule,
     MongooseModule.forFeature([
       { name: Booking.name, schema: BookingSchema },
       { name: Payment.name, schema: PaymentSchema },
@@ -32,9 +27,10 @@ import { BookingsModule } from "../bookings/bookings.module";
       { name: Closure.name, schema: ClosureSchema },
       { name: Coupon.name, schema: CouponSchema },
       { name: Checkin.name, schema: CheckinSchema },
+      { name: AuditLog.name, schema: AuditLogSchema },
     ]),
   ],
   controllers: [AdminAuthController, AdminController, CouponsController],
-  providers: [AdminService, AdminAuthGuard],
+  providers: [AdminService],
 })
 export class AdminModule {}

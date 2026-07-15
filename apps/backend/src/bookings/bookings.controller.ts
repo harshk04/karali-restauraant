@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Param, Post } from "@nestjs/common";
-import { IsNumber, IsOptional, IsString, Matches, Min } from "class-validator";
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
+import { IsEmail, IsIn, IsNumber, IsOptional, IsString, Matches, Min, ValidateIf } from "class-validator";
 import { BookingsService } from "./bookings.service";
+import { AdminAuthGuard } from "../admin/admin.guard";
 
 class CreateBookingDto {
   @IsString()
@@ -16,11 +17,12 @@ class CreateBookingDto {
   customerName?: string;
 
   @IsOptional()
-  @IsString()
+  @ValidateIf((_, value) => value !== "")
+  @IsEmail()
   email?: string;
 
   @IsOptional()
-  @IsString()
+  @Matches(/^(?:\+91\d{10}|\d{10})$/)
   phone?: string;
 
   @IsOptional()
@@ -28,7 +30,7 @@ class CreateBookingDto {
   specialRequest?: string;
 
   @IsOptional()
-  @IsString()
+  @IsIn(["razorpay", "pay_later"])
   paymentMethod?: "razorpay" | "pay_later";
 
   @IsOptional()
@@ -50,14 +52,15 @@ class CreateBookingDto {
 export class BookingsController {
   constructor(private readonly bookingsService: BookingsService) {}
 
+  @UseGuards(AdminAuthGuard)
   @Get()
   list() {
     return this.bookingsService.list();
   }
 
   @Get(":id")
-  findOne(@Param("id") id: string) {
-    return this.bookingsService.findOne(id);
+  findOne(@Param("id") id: string, @Query("accessKey") accessKey: string) {
+    return this.bookingsService.getPublicBooking(id, accessKey);
   }
 
   @Post()

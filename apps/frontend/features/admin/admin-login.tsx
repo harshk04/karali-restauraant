@@ -25,12 +25,7 @@ export function AdminLogin({ redirectTo = "/admin" }: { redirectTo?: string }) {
     setLoading(true);
     setError("");
     try {
-      const loginResponse = await api.post("/admin/auth/login", { email, password });
-      const token = loginResponse.data?.token as string | undefined;
-      if (token) {
-        window.localStorage.setItem("karali_admin_token", token);
-        document.cookie = "admin_session_hint=1; path=/; samesite=lax";
-      }
+      await api.post("/admin/auth/login", { email, password });
       await api.get("/admin/auth/me");
       router.replace(redirectTo as never);
     } catch (error) {
@@ -55,7 +50,7 @@ export function AdminLogin({ redirectTo = "/admin" }: { redirectTo?: string }) {
           Sign in to the admin panel
         </h1>
         <p className="mt-2 text-sm text-[#554336]">
-          Use the fixed admin credentials to access bookings, availability, and coupons.
+          Use your administrator credentials to access bookings, availability, and staff tools.
         </p>
       </div>
       <form className="space-y-4" onSubmit={handleSubmit}>

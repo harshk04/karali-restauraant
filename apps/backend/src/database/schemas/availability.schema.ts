@@ -34,3 +34,4 @@ export class Availability {
 }
 
 export const AvailabilitySchema = SchemaFactory.createForClass(Availability);
+AvailabilitySchema.index({ scope: 1, date: 1, active: 1 });

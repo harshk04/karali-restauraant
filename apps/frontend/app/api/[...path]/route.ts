@@ -18,6 +18,7 @@ async function proxy(request: Request, context: any) {
     method: request.method,
     headers,
     redirect: "manual",
+    cache: "no-store",
   };
 
   if (!["GET", "HEAD"].includes(request.method)) {

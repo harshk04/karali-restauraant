@@ -23,4 +23,10 @@ export default () => ({
     process.env.WHATSAPP_USE_BOOKING_TEMPLATE === "true",
   frontendUrl: process.env.FRONTEND_URL,
   backendUrl: process.env.BACKEND_URL,
+  corsOrigins: process.env.CORS_ORIGINS || process.env.FRONTEND_URL || "",
+  adminEmail: process.env.ADMIN_EMAIL || "admin@example.com",
+  adminPassword: process.env.ADMIN_PASSWORD || "",
+  adminPasswordHash: process.env.ADMIN_PASSWORD_HASH || "",
+  adminName: process.env.ADMIN_NAME || "Admin",
+  adminMobile: process.env.ADMIN_MOBILE || "",
 });

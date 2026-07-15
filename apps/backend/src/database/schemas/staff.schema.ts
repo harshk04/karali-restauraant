@@ -11,7 +11,7 @@ export class Staff {
   @Prop({ required: true, unique: true, index: true })
   username!: string;
 
-  @Prop({ required: true })
+  @Prop({ required: true, select: false })
   passwordHash!: string;
 
   @Prop({ default: "" })
@@ -37,3 +37,4 @@ export class Staff {
 }
 
 export const StaffSchema = SchemaFactory.createForClass(Staff);
+StaffSchema.index({ email: 1 }, { sparse: true });

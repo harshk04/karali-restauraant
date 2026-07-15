@@ -203,6 +203,10 @@ export function BookingFlow() {
   });
 
   useEffect(() => {
+    void useBookingStore.persist.rehydrate();
+  }, []);
+
+  useEffect(() => {
     if (!searchParams) {
       resetBooking();
       setStep(1);
@@ -356,7 +360,7 @@ export function BookingFlow() {
       setBookingId(response.data.bookingId);
       setPaymentPhase("success");
       router.push(
-        `/booking/confirmed?bookingId=${encodeURIComponent(response.data.bookingId)}`,
+        `/booking/confirmed?bookingId=${encodeURIComponent(response.data.bookingId)}&accessKey=${encodeURIComponent(response.data.accessKey || "")}`,
       );
     } catch (error) {
       setBookingError(
@@ -430,7 +434,7 @@ export function BookingFlow() {
             setBookingId(createResponse.data.bookingId);
             setPaymentPhase("success");
             router.push(
-              `/booking/confirmed?bookingId=${encodeURIComponent(createResponse.data.bookingId)}`,
+              `/booking/confirmed?bookingId=${encodeURIComponent(createResponse.data.bookingId)}&accessKey=${encodeURIComponent(createResponse.data.accessKey || "")}`,
             );
           } else {
             throw new Error("Payment verification failed.");

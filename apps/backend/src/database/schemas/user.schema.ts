@@ -14,7 +14,7 @@ export class User {
   @Prop({ default: "" })
   phone!: string;
 
-  @Prop({ default: "" })
+  @Prop({ default: "", select: false })
   password!: string;
 
   @Prop({ required: true, default: "customer" })
@@ -55,3 +55,4 @@ export class User {
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
+UserSchema.index({ phone: 1 }, { sparse: true });

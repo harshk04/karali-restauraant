@@ -4,13 +4,16 @@ import type { Response, Request } from "express";
 import { AdminAuthGuard } from "./admin.guard";
 import { AdminService } from "./admin.service";
 import { BookingsService } from "../bookings/bookings.service";
-
-type AdminSession = {
-  email: string;
-  name: string;
-  mobile: string;
-  role: "admin";
-};
+import { AuthRateLimitGuard } from "../common/guards/auth-rate-limit.guard";
+import {
+  ADMIN_ACCESS_COOKIE,
+  ADMIN_REFRESH_COOKIE,
+} from "../common/auth/session.constants";
+import type { AdminSession } from "../common/auth/session.types";
+import {
+  buildCookieClearOptions,
+  buildSessionCookieOptions,
+} from "../common/auth/cookie.util";
 
 class AdminLoginDto {
   @IsEmail()
@@ -141,7 +144,7 @@ class ScanQrDto {
   bookingId!: string;
 
   @IsString()
-  staffId!: string;
+  qrToken!: string;
 }
 
 class ManualBookingDto {
@@ -172,45 +175,44 @@ class ManualBookingDto {
 export class AdminAuthController {
   constructor(private readonly adminService: AdminService) {}
 
+  @UseGuards(AuthRateLimitGuard)
   @Post("login")
-  login(@Body() dto: AdminLoginDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
-    const result = this.adminService.login(dto.email, dto.password);
+  async login(@Body() dto: AdminLoginDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const result = await this.adminService.login(dto.email, dto.password);
     if (!result) {
       throw new UnauthorizedException("Invalid admin credentials");
     }
 
-    const forwardedProto = request.headers["x-forwarded-proto"];
-    const protoValue = Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto;
-    const isHttps = request.secure || protoValue?.split(",")[0]?.trim() === "https";
+    response.cookie(ADMIN_ACCESS_COOKIE, result.accessToken, buildSessionCookieOptions(request, 15 * 60 * 1000));
+    response.cookie(ADMIN_REFRESH_COOKIE, result.refreshToken, buildSessionCookieOptions(request, 7 * 24 * 60 * 60 * 1000));
 
-    response.cookie("admin_session", result.token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production" && isHttps,
-      path: "/",
-      maxAge: 6 * 60 * 60 * 1000,
-    });
-    response.cookie("admin_session_hint", "1", {
-      httpOnly: false,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production" && isHttps,
-      path: "/",
-      maxAge: 6 * 60 * 60 * 1000,
-    });
-
-    return { success: true, admin: result.session, token: result.token };
+    return { admin: result.session };
   }
 
   @UseGuards(AdminAuthGuard)
   @Get("me")
   me(@Req() request: Request & { admin?: AdminSession }) {
-    return { success: true, admin: this.adminService.me(request.admin) };
+    return this.adminService.me(request.admin);
+  }
+
+  @UseGuards(AuthRateLimitGuard)
+  @Post("refresh")
+  refresh(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const refreshToken = request.cookies?.[ADMIN_REFRESH_COOKIE] as string | undefined;
+    if (!refreshToken) {
+      throw new UnauthorizedException("Refresh session required");
+    }
+
+    const result = this.adminService.refresh(refreshToken);
+    response.cookie(ADMIN_ACCESS_COOKIE, result.accessToken, buildSessionCookieOptions(request, 15 * 60 * 1000));
+    response.cookie(ADMIN_REFRESH_COOKIE, result.refreshToken, buildSessionCookieOptions(request, 7 * 24 * 60 * 60 * 1000));
+    return { admin: result.session };
   }
 
   @Post("logout")
   logout(@Res({ passthrough: true }) response: Response) {
-    response.clearCookie("admin_session", { path: "/" });
-    response.clearCookie("admin_session_hint", { path: "/" });
+    response.clearCookie(ADMIN_ACCESS_COOKIE, buildCookieClearOptions());
+    response.clearCookie(ADMIN_REFRESH_COOKIE, buildCookieClearOptions());
     return { success: true };
   }
 }

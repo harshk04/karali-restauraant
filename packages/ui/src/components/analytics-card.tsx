@@ -19,7 +19,7 @@ export function AnalyticsCard({
           <p className="text-xs uppercase tracking-[0.28em] text-[#554336]/60">
             {title}
           </p>
-          <p className="lux-heading mt-3 text-4xl font-bold text-[#231a13]">
+          <p className="lux-heading mt-3 text-3xl font-bold text-[#231a13] sm:text-4xl">
             {value}
           </p>
           {subtitle ? (

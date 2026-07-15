@@ -28,6 +28,7 @@ export function ScannerSuccessClient({
   const paymentStatus = first(searchParams.paymentStatus) || "pending";
   const totalAmount = first(searchParams.totalAmount) || "0";
   const checkedInAt = first(searchParams.checkedInAt);
+  const alreadyCheckedIn = first(searchParams.alreadyCheckedIn) === "true";
   const prepaidAmount =
     paymentStatus === "paid" && Number(totalAmount || 0) > 0
       ? currency(totalAmount)
@@ -43,13 +44,18 @@ export function ScannerSuccessClient({
       >
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="lux-eyebrow">Check-In Complete</p>
+            <p className="lux-eyebrow">
+              {alreadyCheckedIn ? "Already Checked In" : "Check-In Complete"}
+            </p>
             <h2 className="lux-heading mt-3 text-3xl font-bold text-[#231a13] sm:text-4xl">
-              Guest successfully checked in
+              {alreadyCheckedIn
+                ? "Guest was already checked in"
+                : "Guest successfully checked in"}
             </h2>
             <p className="mt-3 max-w-2xl text-lg text-[#554336]">
-              Arrival has been confirmed and the table handoff is ready for the
-              floor team.
+              {alreadyCheckedIn
+                ? "This booking had already been marked as arrived, so the floor team can continue without any changes."
+                : "Arrival has been confirmed and the table handoff is ready for the floor team."}
             </p>
           </div>
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#8f4a00] text-4xl text-white shadow-[0_20px_50px_-12px_rgba(143,74,0,0.18)] sm:h-24 sm:w-24 sm:text-5xl">

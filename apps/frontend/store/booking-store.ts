@@ -50,6 +50,7 @@ export const useBookingStore = create<BookingStore>()(
     }),
     {
       name: "karali-booking-store",
+      skipHydration: true,
       partialize: (state) => ({
         currentStep: state.currentStep,
         date: state.date,

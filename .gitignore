@@ -11,6 +11,10 @@ apps/**/dist/
 packages/**/dist/
 coverage/
 .turbo/
+*.tsbuildinfo
+
+# Generated TypeScript helper files
+packages/*/src/env.d.ts
 
 # Test artifacts
 playwright-report/
@@ -42,4 +46,3 @@ Thumbs.db
 
 # Local infrastructure overrides
 docker-compose.override.yml
-

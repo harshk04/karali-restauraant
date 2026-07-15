@@ -31,3 +31,4 @@ export class Closure {
 }
 
 export const ClosureSchema = SchemaFactory.createForClass(Closure);
+ClosureSchema.index({ active: 1, startDate: 1, endDate: 1 });

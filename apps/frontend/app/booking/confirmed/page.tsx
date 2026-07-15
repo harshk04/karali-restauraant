@@ -66,7 +66,6 @@ type BookingQr = {
   date: string;
   time: string;
   pax: number;
-  signature: string;
   expiry: string;
   qrCode: string;
 };
@@ -74,23 +73,26 @@ type BookingQr = {
 export default async function ConfirmedPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ bookingId?: string }>;
+  searchParams?: Promise<{ bookingId?: string; accessKey?: string; shareToken?: string }>;
 }) {
   const params = (await searchParams) ?? {};
   const bookingId = params.bookingId ?? "KR-9284-LX";
+  const accessKey = params.accessKey ?? "";
+  const shareToken = params.shareToken ?? "";
   let qr: BookingQr = {
     bookingId,
     customerName: "Guest",
     date: "Today",
     time: "12:00",
     pax: 2,
-    signature: "",
     expiry: "",
     qrCode: JSON.stringify({ bookingId }),
   };
 
   try {
-    const response = await api.get(`/qr/${bookingId}`);
+    const response = await api.get(`/qr/${bookingId}`, {
+      params: shareToken ? { shareToken } : { accessKey },
+    });
     qr = response.data as BookingQr;
   } catch {
     // Fall back to a graceful confirmation card if the QR lookup is unavailable.

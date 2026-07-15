@@ -1,7 +1,7 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
-import { JwtService } from "@nestjs/jwt";
 import { Model } from "mongoose";
+import bcrypt from "bcryptjs";
 import { Booking, BookingDocument } from "../database/schemas/booking.schema";
 import { Payment, PaymentDocument } from "../database/schemas/payment.schema";
 import { Availability, AvailabilityDocument } from "../database/schemas/availability.schema";
@@ -9,23 +9,33 @@ import { RestaurantTiming, RestaurantTimingDocument } from "../database/schemas/
 import { Closure, ClosureDocument } from "../database/schemas/closure.schema";
 import { Coupon, CouponDocument } from "../database/schemas/coupon.schema";
 import { Checkin, CheckinDocument } from "../database/schemas/checkin.schema";
+import { AuditLog, AuditLogDocument } from "../database/schemas/audit-log.schema";
+import { SessionTokenService } from "../common/auth/session-token.service";
+import type { AdminSession } from "../common/auth/session.types";
+import { BookingsService } from "../bookings/bookings.service";
 
-type AdminSession = {
-  email: string;
-  name: string;
-  mobile: string;
-  role: "admin";
-};
-
-const ADMIN_EMAIL = "admin@example.com";
-const ADMIN_PASSWORD = "password";
-const ADMIN_NAME = "Admin";
-const ADMIN_MOBILE = "9928967278";
+const HARD_CODED_ADMIN_EMAIL = "admin@example.com";
+const HARD_CODED_ADMIN_PASSWORD = "password";
+const HARD_CODED_ADMIN_NAME = "Admin";
+const HARD_CODED_ADMIN_MOBILE = "";
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger(AdminService.name);
+  private readonly allowedTransitions: Record<
+    Booking["status"],
+    Array<Booking["status"]>
+  > = {
+    pending: ["confirmed", "cancelled", "no_show"],
+    confirmed: ["checked_in", "cancelled", "no_show"],
+    checked_in: ["completed"],
+    completed: [],
+    no_show: [],
+    cancelled: [],
+  };
+
   constructor(
-    private readonly jwtService: JwtService,
+    private readonly sessionTokenService: SessionTokenService,
     @InjectModel(Booking.name) private readonly bookingModel: Model<BookingDocument>,
     @InjectModel(Payment.name) private readonly paymentModel: Model<PaymentDocument>,
     @InjectModel(Availability.name) private readonly availabilityModel: Model<AvailabilityDocument>,
@@ -33,44 +43,74 @@ export class AdminService {
     @InjectModel(Closure.name) private readonly closureModel: Model<ClosureDocument>,
     @InjectModel(Coupon.name) private readonly couponModel: Model<CouponDocument>,
     @InjectModel(Checkin.name) private readonly checkinModel: Model<CheckinDocument>,
+    @InjectModel(AuditLog.name) private readonly auditLogModel: Model<AuditLogDocument>,
+    private readonly bookingsService: BookingsService,
   ) {}
 
   private get adminEmail() {
-    return ADMIN_EMAIL;
+    return HARD_CODED_ADMIN_EMAIL;
   }
 
   private get adminPassword() {
-    return ADMIN_PASSWORD;
+    return HARD_CODED_ADMIN_PASSWORD;
+  }
+
+  private get adminPasswordHash() {
+    return "";
   }
 
   private get adminName() {
-    return ADMIN_NAME;
+    return HARD_CODED_ADMIN_NAME;
   }
 
   private get adminMobile() {
-    return ADMIN_MOBILE;
+    return HARD_CODED_ADMIN_MOBILE;
   }
 
-  login(email: string, password: string) {
+  private async logAction(action: string, metadata: Record<string, unknown> = {}, targetId = "") {
+    await this.auditLogModel.create({
+      actorId: "admin",
+      actorRole: "admin",
+      action,
+      targetId,
+      metadata,
+    });
+  }
+
+  async login(email: string, password: string) {
     const normalizedEmail = String(email ?? "").trim().toLowerCase();
     const normalizedPassword = String(password ?? "").trim();
-    if (normalizedEmail !== this.adminEmail.trim().toLowerCase() || normalizedPassword !== this.adminPassword.trim()) {
+
+    if (normalizedEmail !== this.adminEmail.trim().toLowerCase()) {
+      return null;
+    }
+
+    const configuredHash = this.adminPasswordHash.trim();
+    const configuredPassword = this.adminPassword.trim();
+    const matches = configuredHash
+      ? await bcrypt.compare(normalizedPassword, configuredHash)
+      : Boolean(configuredPassword) && normalizedPassword === configuredPassword;
+
+    if (!matches) {
+      this.logger.warn(`Rejected admin login attempt for ${normalizedEmail}`);
       return null;
     }
 
     const session: AdminSession = {
+      id: "admin",
       email: this.adminEmail,
       name: this.adminName,
       mobile: this.adminMobile,
       role: "admin",
     };
 
-    const token = this.jwtService.sign(session, {
-      secret: process.env.JWT_SECRET || "change-me",
-      expiresIn: "6h",
-    });
+    await this.logAction("admin.login", { email: normalizedEmail }, "admin");
 
-    return { session, token };
+    return {
+      session,
+      accessToken: this.sessionTokenService.signAccessToken({ role: "admin", session }),
+      refreshToken: this.sessionTokenService.signRefreshToken("admin", session.id),
+    };
   }
 
   me(session: AdminSession | undefined) {
@@ -79,6 +119,28 @@ export class AdminService {
     }
 
     return session;
+  }
+
+  refresh(token: string) {
+    const payload = this.sessionTokenService.verifyRefreshToken(token, "admin");
+
+    const session: AdminSession = {
+      id: "admin",
+      email: this.adminEmail,
+      name: this.adminName,
+      mobile: this.adminMobile,
+      role: "admin",
+    };
+
+    if (payload.sub !== session.id) {
+      throw new UnauthorizedException("Invalid refresh token.");
+    }
+
+    return {
+      session,
+      accessToken: this.sessionTokenService.signAccessToken({ role: "admin", session }),
+      refreshToken: this.sessionTokenService.signRefreshToken("admin", session.id),
+    };
   }
 
   async dashboard() {
@@ -111,11 +173,45 @@ export class AdminService {
   }
 
   async updateBooking(bookingId: string, payload: Record<string, unknown>) {
+    const existing = await this.bookingModel.findOne({ bookingId }).lean();
+    if (!existing) {
+      throw new NotFoundException("Booking not found.");
+    }
+
+    if (typeof payload.status === "string" && payload.status !== existing.status) {
+      const nextStatus = payload.status as Booking["status"];
+      if (!this.allowedTransitions[existing.status]?.includes(nextStatus)) {
+        throw new BadRequestException(`Cannot move booking from ${existing.status} to ${nextStatus}.`);
+      }
+    }
+
+    if (
+      payload.date !== undefined ||
+      payload.time !== undefined ||
+      payload.pax !== undefined
+    ) {
+      throw new BadRequestException("Direct rescheduling is disabled until slot reallocation is implemented.");
+    }
+
     const booking = await this.bookingModel.findOneAndUpdate({ bookingId }, { $set: payload }, { new: true }).lean();
+    await this.logAction("admin.booking_updated", { bookingId, fields: Object.keys(payload) }, bookingId);
     return booking;
   }
 
   async markBooking(bookingId: string, status: "checked_in" | "completed" | "no_show" | "cancelled") {
+    const current = await this.bookingModel.findOne({ bookingId }).lean();
+    if (!current) {
+      throw new NotFoundException("Booking not found.");
+    }
+
+    if (!this.allowedTransitions[current.status]?.includes(status)) {
+      throw new BadRequestException(`Cannot move booking from ${current.status} to ${status}.`);
+    }
+
+    if (status === "cancelled" && current.status !== "cancelled") {
+      await this.bookingsService.releaseBookingSlotIfNeeded(bookingId);
+    }
+
     const payload: Record<string, unknown> = { status };
     if (status === "checked_in") payload.checkedInAt = new Date();
     if (status === "completed") payload.completedAt = new Date();
@@ -137,6 +233,7 @@ export class AdminService {
         { upsert: true },
       );
     }
+    await this.logAction("admin.booking_status_updated", { bookingId, status }, bookingId);
     return booking;
   }
 
@@ -360,24 +457,44 @@ export class AdminService {
       { _id: coupon._id },
       { $push: { usedBy: userId }, $inc: { totalUsed: 1 } },
     );
+    await this.logAction("coupon.applied", { code: coupon.code, bookingUserId: userId, amount, discount }, code);
     return { coupon, discount };
   }
 
-  async scanQr(payload: { bookingId: string; staffId: string }) {
+  async scanQr(payload: { bookingId: string; qrToken: string }) {
+    const validation = await this.bookingsService.validateQrToken(payload.bookingId, payload.qrToken);
+    if (!validation.valid) {
+      throw new BadRequestException("Invalid or expired QR code.");
+    }
+
+    const existing = await this.bookingModel.findOne({ bookingId: payload.bookingId }).lean();
+    if (!existing) {
+      throw new NotFoundException("Booking not found.");
+    }
+
+    if (existing.status === "checked_in" || existing.checkedInAt) {
+      await this.logAction("admin.qr_scanned_duplicate", { bookingId: payload.bookingId }, payload.bookingId);
+      return {
+        ...existing,
+        alreadyCheckedIn: true,
+      };
+    }
+
     const booking = await this.markBooking(payload.bookingId, "checked_in");
     await this.checkinModel.updateOne(
       { bookingId: payload.bookingId },
       {
         $set: {
           bookingId: payload.bookingId,
-          staffId: payload.staffId,
-          checkedInByStaffId: payload.staffId,
+          staffId: "admin",
+          checkedInByStaffId: "admin",
           status: "checked_in",
           checkedInAt: new Date(),
         },
       },
       { upsert: true },
     );
+    await this.logAction("admin.qr_scanned", { bookingId: payload.bookingId }, payload.bookingId);
     return booking;
   }
 }

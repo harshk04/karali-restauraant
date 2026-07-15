@@ -1,8 +1,8 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, UnauthorizedException } from "@nestjs/common";
 
 @Injectable()
 export class UsersService {
   me() {
-    return { id: "u_1", name: "Elena Ray", email: "elena@karali.aero", role: "manager" };
+    throw new UnauthorizedException("Authentication required.");
   }
 }

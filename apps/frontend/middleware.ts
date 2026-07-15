@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (pathname.startsWith("/admin")) {
-    const hasSession = request.cookies.get("admin_session") || request.cookies.get("admin_session_hint");
+    const hasSession = request.cookies.get("admin_session");
     if (!hasSession) {
       const loginUrl = request.nextUrl.clone();
       loginUrl.pathname = "/login";
@@ -16,7 +16,7 @@ export function middleware(request: NextRequest) {
     if (pathname === "/staff/login") {
       return NextResponse.next();
     }
-    const hasSession = request.cookies.get("staff_session") || request.cookies.get("staff_session_hint");
+    const hasSession = request.cookies.get("staff_session");
     if (!hasSession) {
       const loginUrl = request.nextUrl.clone();
       loginUrl.pathname = "/staff/login";

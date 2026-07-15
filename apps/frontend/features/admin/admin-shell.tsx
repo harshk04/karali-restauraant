@@ -40,8 +40,6 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
   async function logout() {
     await api.post("/admin/auth/logout");
-    window.localStorage.removeItem("karali_admin_token");
-    document.cookie = "admin_session_hint=; path=/; max-age=0; samesite=lax";
     router.replace("/login");
   }
 

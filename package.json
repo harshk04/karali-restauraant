@@ -14,6 +14,7 @@
     "db:seed": "pnpm --filter @karali/backend prisma db seed"
   },
   "devDependencies": {
+    "@next/eslint-plugin-next": "^16.2.10",
     "@playwright/test": "^1.55.0",
     "@types/node": "^22.10.2",
     "@typescript-eslint/eslint-plugin": "^8.38.0",
